@@ -38,11 +38,18 @@ To secure **1st Place Grand Prize ($12,000)** while stacking **Special Prizes ($
 | **Presentation** | 20% | Crisp, captivating demo video (<3 min), compelling storytelling, transparent architecture explanation. | Screen recording of live running code (no pitch decks or conceptual mockups), high-tempo narration, clear problem-to-solution transition. |
 
 ### 2.2 Target Prize Tracks & Stackability
+
+> **Correction (2026-10-12, verified against the [Official Rules §8](https://paypalaihackathon.devpost.com/rules)):** prizes do **not** stack freely. *"A project can only win up to one (1) Grand Prize and one (1) Sponsor Prize OR one (1) Honorable Mention Prize and one (1) Sponsor Prize."* The five special awards below are **Honorable Mention** prizes. Render's sponsor prizes are paid in **Render credits**, not cash. The earlier "$24k–$29k stack" figures were wrong and have been replaced.
+
 ```mermaid
 flowchart TD
-    GP["Grand Prize 1st Place ($12,000)"]
+    subgraph GrandPrizes ["Grand Prizes (win at most ONE)"]
+        GP["1st Place ($12,000)"]
+        GP2["2nd Place ($8,000)"]
+        GP3["3rd Place ($5,000)"]
+    end
     
-    subgraph SpecialPrizes ["PayPal Special Prizes ($5,000 each)"]
+    subgraph SpecialPrizes ["Honorable Mentions ($5,000 each) — mutually exclusive with Grand Prizes"]
         SP1["Best Use of Agentic Commerce"]
         SP2["Best Use of PayPal + AI"]
         SP3["Most Creative"]
@@ -50,21 +57,27 @@ flowchart TD
         SP5["Best Demo Delivery"]
     end
     
-    subgraph SponsorPrizes ["Sponsor Cash Awards"]
-        AG["AG Grid Award ($5,000 / $2,000 / $1,000)"]
-        AP["APIMatic Award ($1,000 + Subscriptions)"]
-        BR["Bryntum Award ($1,000)"]
-        CH["Channel3 Award ($1,500)"]
-        RN["Render Award ($1,000 / $750 / $500)"]
+    subgraph SponsorPrizes ["Sponsor Prizes (win at most ONE, in addition)"]
+        AG["AG Grid / AG Studio ($5,000 / $2,000 / $1,000 x3)"]
+        AP["APIMatic ($1,000 x3 + 6-mo Business subscription)"]
+        BR["Bryntum ($1,000 x3)"]
+        CH["Channel3 ($1,500)"]
+        RN["Render ($1,000 / $750 / $500 in credits)"]
     end
 
-    GP --- SpecialPrizes
-    SpecialPrizes --- SponsorPrizes
+    GrandPrizes -. "OR" .- SpecialPrizes
+    GrandPrizes -- "+ one" --- SponsorPrizes
+    SpecialPrizes -- "+ one" --- SponsorPrizes
 ```
 
-- **Stack 1 (The Enterprise Defense Stack):** Grand Prize + Best Use of PayPal + AI ($5k) + Most Impactful ($5k) + AG Grid ($5k) + Bryntum ($1k) + Render ($1k) = **Up to $29,000 potential capture**. (Champion: *DisputeShield AI*)
-- **Stack 2 (The Agentic Commerce Stack):** Grand Prize + Best Use of Agentic Commerce ($5k) + Most Creative ($5k) + AG Grid ($2k) + Channel3 ($1.5k) + APIMatic ($1k) + Render ($1k) = **Up to $27,500 potential capture**. (Champion: *PayAgent OS*)
-- **Stack 3 (The B2B Cash Flow Stack):** Grand Prize + Most Impactful ($5k) + AG Grid ($5k) + Bryntum ($1k) + Render ($1k) = **Up to $24,000 potential capture**. (Champion: *FlowFactor AI*)
+**Maximum capture per project:**
+
+| Path | Formula | Max cash |
+|---|---|---|
+| Grand + Sponsor | 1st Place ($12,000) + AG Grid 1st ($5,000) | **$17,000** |
+| Honorable Mention + Sponsor | Any special award ($5,000) + AG Grid 1st ($5,000) | **$10,000** |
+
+**Strategic implication:** only **one** sponsor prize can be won, so integrating several sponsors adds no prize money. Pick the single highest-value sponsor bet (AG Grid / AG Studio: $5k first place and 5 winning slots), and add other sponsors only where they genuinely improve the product. Note also that the AG Grid award is judged on **AG Studio** (custom widgets, theming, layout tools, Studio Agent Framework), not plain AG Grid tables.
 
 ---
 
@@ -420,19 +433,21 @@ OmniChannel Concierge is a conversational shopping companion that merges multi-c
 
 ## 4. Comparative Evaluation Matrix & Scoring Radar
 
-To select the highest-probability champion submission, we rigorously score all 9 concepts across the 5 official hackathon criteria plus two crucial strategic dimensions: **Demo Wow Factor** (essential for the 20% Presentation score and the $5,000 Best Demo Delivery track) and **Sponsor Prize Stackability** (maximizing total dollar yield).
+To select the highest-probability champion submission, we rigorously score all 9 concepts across the 5 official hackathon criteria plus two crucial strategic dimensions: **Demo Wow Factor** (essential for the 20% Presentation score and the $5,000 Best Demo Delivery track) and **Sponsor Fit** (which sponsor tools each concept would use).
 
-| Concept | Tech (20%) | Design (20%) | Impact (20%) | Innov (20%) | Pres / Demo (20%) | Base Score (100) | Sponsor Stackability | Est. Prize Potential |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **#1 DisputeShield AI** | **5.0** | **5.0** | **5.0** | **4.8** | **5.0** | **99.0** | AG Grid + Bryntum + Render | **$29,000** |
-| **#2 PayAgent OS** | **5.0** | **4.8** | **4.9** | **5.0** | **4.9** | **98.2** | AG Grid + Channel3 + APIMatic + Render | **$27,500** |
-| **#3 FlowFactor AI** | **4.9** | **4.9** | **5.0** | **4.7** | **4.8** | **97.2** | AG Grid + Bryntum + Render | **$24,000** |
-| **#4 SubZero** | 4.6 | 4.6 | 4.7 | 4.9 | 4.9 | 94.6 | AG Grid + Render | $17,000 |
-| **#5 AgentMesh** | 4.9 | 4.5 | 4.7 | 5.0 | 4.7 | 95.6 | AG Grid + APIMatic + Render | $20,000 |
-| **#6 NexusSupply** | 4.6 | 4.7 | 4.8 | 4.5 | 4.5 | 93.4 | AG Grid + Bryntum + Channel3 | $18,500 |
-| **#7 GuardianPay** | 4.6 | 4.8 | 5.0 | 4.6 | 4.9 | 95.8 | AG Grid + Render | $17,000 |
-| **#8 FairSplit AI** | 4.5 | 4.5 | 4.4 | 4.7 | 4.6 | 91.6 | AG Grid + APIMatic + Render | $16,000 |
-| **#9 OmniChannel Concierge** | 4.6 | 4.9 | 4.6 | 4.5 | 4.8 | 94.0 | Channel3 + AG Grid + Render | $18,500 |
+> **Corrected:** the "Max Capture (Rules)" column (formerly "Est. Prize Potential") is now the rules-compliant ceiling: one Grand Prize plus one Sponsor prize (§2.2). Every concept can integrate AG Grid, so every ceiling is the same **$17,000** (1st Place $12k + AG Grid 1st $5k). The prize ceiling therefore does **not** separate the concepts; the base score and how strongly AG Studio fits the concept do.
+
+| Concept                      | Tech (20%) | Design (20%) | Impact (20%) | Innov (20%) | Pres / Demo (20%) | Base Score (100) |               Sponsor Fit             | Max Capture (Rules) |
+| :--------------------------- | :--------: | :----------: | :----------: | :---------: | :---------------: | :--------------: | :------------------------------------: | :------------------: |
+| **#1 DisputeShield AI**      |  **5.0**   |   **5.0**    |   **5.0**    |   **4.8**   |      **5.0**      |     **99.0**     |       AG Grid + Bryntum + Render       |     **$17,000**      |
+| **#2 PayAgent OS**           |  **5.0**   |   **4.8**    |   **4.9**    |   **5.0**   |      **4.9**      |     **98.2**     | AG Grid + Channel3 + APIMatic + Render |     **$17,000**      |
+| **#3 FlowFactor AI**         |  **4.9**   |   **4.9**    |   **5.0**    |   **4.7**   |      **4.8**      |     **97.2**     |       AG Grid + Bryntum + Render       |     **$17,000**      |
+| **#4 SubZero**               |    4.6     |     4.6      |     4.7      |     4.9     |        4.9        |       94.6       |            AG Grid + Render            |       $17,000        |
+| **#5 AgentMesh**             |    4.9     |     4.5      |     4.7      |     5.0     |        4.7        |       95.6       |      AG Grid + APIMatic + Render       |       $17,000        |
+| **#6 NexusSupply**           |    4.6     |     4.7      |     4.8      |     4.5     |        4.5        |       93.4       |      AG Grid + Bryntum + Channel3      |       $17,000        |
+| **#7 GuardianPay**           |    4.6     |     4.8      |     5.0      |     4.6     |        4.9        |       95.8       |            AG Grid + Render            |       $17,000        |
+| **#8 FairSplit AI**          |    4.5     |     4.5      |     4.4      |     4.7     |        4.6        |       91.6       |      AG Grid + APIMatic + Render       |       $17,000        |
+| **#9 OmniChannel Concierge** |    4.6     |     4.9      |     4.6      |     4.5     |        4.8        |       94.0       |      Channel3 + AG Grid + Render       |       $17,000        |
 
 ---
 
@@ -443,9 +458,9 @@ From our comprehensive analysis, three concepts emerge as clear front-runners ca
 ```mermaid
 graph TD
     subgraph Podium ["The Top 3 Hackathon Champions"]
-        Rank1["🥇 1. DisputeShield AI<br/><b>Overall Grand Prize & Impact Champion</b><br/>Score: 99.0/100 | Target: $29,000"]
-        Rank2["🥈 2. PayAgent OS<br/><b>Agentic Commerce & Innovation Champion</b><br/>Score: 98.2/100 | Target: $27,500"]
-        Rank3["🥉 3. FlowFactor AI<br/><b>B2B Enterprise & Fintech Champion</b><br/>Score: 97.2/100 | Target: $24,000"]
+        Rank1["🥇 1. DisputeShield AI<br/><b>Overall Grand Prize & Impact Champion</b><br/>Score: 99.0/100 | Max: $17,000"]
+        Rank2["🥈 2. PayAgent OS<br/><b>Agentic Commerce & Innovation Champion</b><br/>Score: 98.2/100 | Max: $17,000"]
+        Rank3["🥉 3. FlowFactor AI<br/><b>B2B Enterprise & Fintech Champion</b><br/>Score: 97.2/100 | Max: $17,000"]
     end
 ```
 
@@ -464,7 +479,7 @@ graph TD
 - **Why It Captures the "Best Use of Agentic Commerce" Track:**
   1. **Direct Alignment with PayPal's AI Vision:** PayPal recently announced its major push into Agentic Commerce, Store Sync, Agent Ready, and the PayPal MCP server. PayAgent OS builds directly on this strategic initiative.
   2. **Solves the Biggest Bottleneck in Autonomous AI:** Every AI researcher knows agents cannot truly operate autonomously without safe, policy-bounded spending credentials. PayAgent OS solves this with Delegated Payment Tokens and deterministic AST policy guardrails.
-  3. **Four-Sponsor Stackability:** Naturally incorporates Channel3 (multi-channel product catalogs), AG Grid (agent transaction ledgers), APIMatic (agent SDKs), and Render (cloud agent hosting).
+  3. **Natural Sponsor Fit (only one sponsor prize can be won, see §2.2):** Naturally incorporates Channel3 (multi-channel product catalogs), AG Grid (agent transaction ledgers), APIMatic (agent SDKs), and Render (cloud agent hosting).
 
 ---
 
@@ -526,6 +541,8 @@ Based on the `startup-pitch-contest` guidelines, the submission video must follo
 ---
 
 ## 7. Strategic Recommendation & Next Steps
+
+> **Superseded (2026-10-12):** the team chose a unified platform, **Mandate**, which merges #2 PayAgent OS (kernel) with #5, #6 and #9 as execution layers. See [`docs/architecture/BLUEPRINT.md`](../docs/architecture/BLUEPRINT.md). The original recommendation is kept below for the record.
 
 For our hackathon submission, we recommend selecting **DisputeShield AI** as our primary Grand Prize vehicle, with **PayAgent OS** as our alternative if the team decides to focus exclusively on the *Best Use of Agentic Commerce* special track.
 
