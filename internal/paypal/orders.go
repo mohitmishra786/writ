@@ -302,3 +302,39 @@ func (c *Client) CaptureOrder(ctx context.Context, id string, opt CallOptions) (
 	}, &o)
 	return o, err
 }
+
+type Refund struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Amount Amount `json:"amount"`
+}
+
+// RefundCapture refunds a capture (Payments v2). A nil amount refunds the
+// remaining captured amount, per the API reference.
+func (c *Client) RefundCapture(ctx context.Context, captureID string, amount *money.Money, invoiceID, note string, opt CallOptions) (Refund, error) {
+	if opt.IdempotencyKey == "" {
+		return Refund{}, ErrMissingIdempotencyKey
+	}
+	body := map[string]any{}
+	if amount != nil {
+		body["amount"] = amountOf(*amount)
+	}
+	if invoiceID != "" {
+		body["invoice_id"] = invoiceID
+	}
+	if note != "" {
+		body["note_to_payer"] = note
+	}
+	var r Refund
+	err := c.do(ctx, request{
+		method: http.MethodPost, path: "/v2/payments/captures/" + url.PathEscape(captureID) + "/refund",
+		body: body, idempotencyKey: opt.IdempotencyKey, prefer: "return=representation", retryable: true,
+	}, &r)
+	return r, err
+}
+
+func (c *Client) GetRefund(ctx context.Context, refundID string) (Refund, error) {
+	var r Refund
+	err := c.do(ctx, request{method: http.MethodGet, path: "/v2/payments/refunds/" + url.PathEscape(refundID), retryable: true}, &r)
+	return r, err
+}

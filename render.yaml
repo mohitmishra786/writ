@@ -1,0 +1,66 @@
+# Render Blueprint for Mandate (https://render.com/docs/blueprint-spec).
+# Secrets use `sync: false`, so Render prompts for them in the Dashboard and
+# they never live in git. Review the cost preview before applying.
+services:
+  - type: web
+    name: mandate-api
+    runtime: go
+    region: oregon
+    plan: 0.5c-512mb # paid instance: free instances spin down after 15 min idle, which breaks webhooks
+    branch: main
+    buildCommand: go build -trimpath -o bin/mandated ./cmd/mandated && go build -trimpath -o bin/mandatectl ./cmd/mandatectl
+    preDeployCommand: ./bin/mandatectl migrate
+    startCommand: ./bin/mandated
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mandate-db
+          property: connectionString
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_BASE_URL
+        value: https://api-m.sandbox.paypal.com
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: MANDATE_SIGNING_SEED
+        sync: false
+      - key: MANDATE_KEY_ID
+        value: mandate-k1
+      - key: CONSOLE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: CLIENT_TOKEN_DOMAIN
+        sync: false
+      - key: NTFY_TOPIC
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: GROQ_MODEL_ORCHESTRATOR
+        value: openai/gpt-oss-120b
+      - key: GROQ_MODEL_SUPPLIER
+        value: openai/gpt-oss-20b
+      - key: CHANNEL3_API_KEY
+        sync: false
+      - key: SUPPLIER_A_SEED
+        sync: false
+      - key: SUPPLIER_B_SEED
+        sync: false
+      - key: SANDBOX_SUPPLIER_A_EMAIL
+        sync: false
+      - key: SANDBOX_SUPPLIER_B_EMAIL
+        sync: false
+
+databases:
+  - name: mandate-db
+    region: oregon
+    plan: 0.1c-256mb # smallest paid plan; free databases are time-limited
+    databaseName: mandate
+    user: mandate

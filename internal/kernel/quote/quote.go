@@ -45,7 +45,11 @@ var (
 
 // ComputeTotal sums lines and shipping in integer minor units.
 func (q Quote) ComputeTotal() (money.Money, error) {
-	total := money.New(0, q.Total.Currency)
+	cur := q.Total.Currency
+	if cur == "" && len(q.Lines) > 0 {
+		cur = q.Lines[0].UnitPrice.Currency
+	}
+	total := money.New(0, cur)
 	for _, l := range q.Lines {
 		ext, err := l.UnitPrice.Mul(l.Qty)
 		if err != nil {

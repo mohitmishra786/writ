@@ -33,9 +33,18 @@ Input validation copies the toolkit's ID patterns exactly:
 - `CAPTURE_ID_REGEX` / `REFUND_ID_REGEX = ^[A-Za-z0-9_-]{15,32}$`
 - `INVOICE_ID_REGEX = ^[A-Za-z0-9_-]{1,127}$`
 
-**Additional Mandate-native tools** (prefixed so they never collide with PayPal names): `mandate_get`, `mandate_propose_purchase` (with a signed supplier quote), `mandate_list_decisions`.
+**Additional Mandate-native tools** (prefixed so they never collide with PayPal names): `mandate_get`, `mandate_propose_purchase` (payee and amount; signed supplier quotes flow through the procurement agent's REST path), `mandate_list_decisions`.
 
-**Deliberately not exposed:** dispute acceptance, subscription cancellation, and invoice cancellation, the irreversible tools PR #91 tried to gate. An agent asking for them gets a structured `TOOL_NOT_DELEGATED` error.
+**Deliberately not exposed:** dispute acceptance, subscription cancellation, and invoice cancellation, the irreversible tools PR #91 tried to gate. They are simply not registered, so an agent cannot discover or call them (the MCP server answers with an unknown-tool error).
+
+## Implementation notes (2026-10-17, after building it)
+
+- **The toolkit is merchant-side.** In `@paypal/agent-toolkit`, `create_order` has no payee: the caller is the merchant receiving money. Under Mandate's JIT model, Mandate is that merchant and the principal's vault is the payer, so the mapping holds. The supplier being paid is supplied through an optional `payee_ref` extension field. Without it, the kernel denies the order (`PAYEE_NOT_ALLOWED`) instead of guessing.
+- **Order IDs.** `create_order` returns the intent's ULID as `id`. ULIDs are 26 uppercase Crockford base32 characters, so they satisfy the toolkit's own `ORDER_ID_REGEX` (`^[A-Z0-9]{17,32}$`), and `pay_order`/`get_order` validate exactly as they would against PayPal.
+- **Statuses.** `create_order` reports PayPal order statuses honestly: `CREATED` only when the mandate authorized the order, `PAYER_ACTION_REQUIRED` while a human co-sign is pending, `VOIDED` when denied. The `mandate` object carries the reason codes.
+- **Money.** The toolkit takes prices as JSON floats. They are converted once to integer cents (round half away from zero) and totals are recomputed in integers.
+- **`list_transactions`** reads the Mandate ledger, not PayPal's Transaction Search API. Its description says so.
+- **Transport.** Stateless Streamable HTTP via `github.com/modelcontextprotocol/go-sdk` v1.8.0, one endpoint per mandate at `/mcp/{mandate_id}`. Verified live: `tools/list`, an attacker-payee `create_order` (denied), an invalid `pay_order` ID, and a refund of a foreign capture (refused).
 
 ## Consequences
 
