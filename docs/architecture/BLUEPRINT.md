@@ -376,7 +376,7 @@ sequenceDiagram
 
 ### 7.4 Mesh — micro-obligations, netting, batched payouts
 
-Micro-tasks (for example a "logistics ETA agent" at $0.35 or a "price-verification agent" at $0.40) are **not** charged one by one.
+Micro-tasks (for example a "logistics ETA agent" at $0.35 or a "price-verification agent" at $0.40) are **not** charged one by one. Measured in sandbox: each payout item carried a $0.25 fee (V20), so paying a $0.35 task on its own would lose 71% to fees.
 
 1. Each accepted micro-task creates an **obligation** `(payee_ref, amount_minor, intent_id)` that is reserved against the envelope (I1 still holds).
 2. The batcher closes a batch when `Σ ≥ threshold` or `age ≥ T` (demo: 60 s). It nets obligations per payee and runs **one** JIT vault charge for the batch total (key `batch_ulid:charge`).
@@ -601,4 +601,5 @@ Every PayPal-specific claim this design depends on, the source it was checked ag
 | V16 | Vaulted charge to a **different** payee (`payee.merchant_id`) | ❌ Not documented for standard apps | Multiparty guide shows it only with partner headers (`usage_type: PLATFORM`); out of scope (D2) |
 | V17 | Log `debug_id` from every error; retry only 429/5xx and only with idempotency keys | ✅ Docs | RulesHub error-handling; skill pre-delivery checklist |
 | V18 | Sandbox app scopes include `vault/payment-tokens/readwrite` and `payments/payouts`; vault setup token creation works | ✅ Live sandbox (2026-10-17) | `POST /v1/oauth2/token` scope list; `POST /v3/vault/setup-tokens` → `PAYER_ACTION_REQUIRED` with `approve` link |
-| V19 | Payouts from the current sandbox business account fail with `PAYOUT_NOT_AVAILABLE` (*"You live in a country that is not allowed to send this payout"*). Fix: US sandbox business account + new Merchant REST app | ⚠️ Live sandbox (debug_id `f108072388f8f`) | [PayPal country/feature list](https://developer.paypal.com/docs/payouts/standard/reference/country-feature/); [PayPal Community thread](https://www.paypal-community.com/t5/REST-APIs/Unable-to-use-Payout-Rest-API/td-p/2098193) |
+| V19 | Payouts from a non-US sandbox business account fail with `PAYOUT_NOT_AVAILABLE`; **resolved** with a US sandbox business account + new Merchant app ("Payment capabilities" → *Save payment methods* + *Payouts* ticked) | ✅ Live sandbox (2026-10-17): batch `TV8C3UG5XB766` → `SUCCESS`, $1.00 delivered to supplier A | [PayPal country/feature list](https://developer.paypal.com/docs/payouts/standard/reference/country-feature/) |
+| V20 | Reusing a `sender_batch_id` is rejected (`USER_BUSINESS_ERROR`); each payout item carried a **$0.25 fee** in sandbox, so micro-obligations must be netted per payee before paying out (§7.4) | ✅ Live sandbox (2026-10-17) | `GET /v1/payments/payouts/TV8C3UG5XB766` (`payout_item_fee`) |
