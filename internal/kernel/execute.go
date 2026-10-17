@@ -454,3 +454,53 @@ func (s *Service) ExpireStale(ctx context.Context) (int, error) {
 	}
 	return n, nil
 }
+
+// ResolvePendingCapture re-checks a PENDING capture with PayPal. Webhooks
+// are hints; this is how CAPTURE_PENDING converges without them.
+func (s *Service) ResolvePendingCapture(ctx context.Context, intentID string) (Intent, error) {
+	it, err := s.GetIntent(ctx, intentID)
+	if err != nil || it.State != fsm.CapturePending || it.CaptureID == "" {
+		return it, err
+	}
+	cp, err := s.pp.GetCapture(ctx, it.CaptureID)
+	if err != nil {
+		return it, err
+	}
+	reason := ""
+	if cp.StatusDetails != nil {
+		reason = cp.StatusDetails.Reason
+	}
+	if cp.Status == "PENDING" {
+		return it, nil
+	}
+	err = s.store.Tx(ctx, func(tx pgx.Tx) error {
+		if it, err = s.loadIntent(ctx, tx, "id", intentID, true); err != nil {
+			return err
+		}
+		if it.State != fsm.CapturePending {
+			return nil
+		}
+		if _, err := tx.Exec(ctx, `UPDATE captures SET status = $2 WHERE capture_id = $1`, cp.ID, cp.Status); err != nil {
+			return err
+		}
+		if _, err := s.store.AppendAudit(ctx, tx, audit.Entry{Kind: audit.KindPayPalResponse, MandateID: it.MandateID, IntentID: it.ID,
+			PayPal: map[string]any{"op": "GET /v2/payments/captures/{id}", "capture_id": cp.ID, "status": cp.Status, "reason": reason}}); err != nil {
+			return err
+		}
+		if cp.Status == "COMPLETED" {
+			amt, err := cp.Amount.Money()
+			if err != nil {
+				return err
+			}
+			return s.markCaptured(ctx, tx, &it, "", amt)
+		}
+		if err := releaseReservation(ctx, tx, &it); err != nil {
+			return err
+		}
+		return s.transition(ctx, tx, &it, fsm.Failed, map[string]any{"capture_status": cp.Status, "reason": reason})
+	})
+	if err == nil {
+		s.publish("intent", it)
+	}
+	return it, err
+}

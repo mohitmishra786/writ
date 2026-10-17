@@ -34,6 +34,7 @@ type PayPal interface {
 	CreateApprovalOrder(ctx context.Context, spec paypal.OrderSpec, returnURL, cancelURL string, opt paypal.CallOptions) (paypal.Order, error)
 	GetOrder(ctx context.Context, id string) (paypal.Order, error)
 	CaptureOrder(ctx context.Context, id string, opt paypal.CallOptions) (paypal.Order, error)
+	GetCapture(ctx context.Context, captureID string) (paypal.Capture, error)
 	CreatePayoutBatch(ctx context.Context, b paypal.PayoutBatch) (paypal.PayoutBatchResult, error)
 	GetPayoutBatch(ctx context.Context, id string) (paypal.PayoutBatchResult, error)
 }

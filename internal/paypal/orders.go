@@ -338,3 +338,11 @@ func (c *Client) GetRefund(ctx context.Context, refundID string) (Refund, error)
 	err := c.do(ctx, request{method: http.MethodGet, path: "/v2/payments/refunds/" + url.PathEscape(refundID), retryable: true}, &r)
 	return r, err
 }
+
+// GetCapture shows a captured payment (Payments v2), used to reconcile
+// PENDING captures (e.g. status_details.reason PENDING_REVIEW or ECHECK).
+func (c *Client) GetCapture(ctx context.Context, captureID string) (Capture, error) {
+	var cp Capture
+	err := c.do(ctx, request{method: http.MethodGet, path: "/v2/payments/captures/" + url.PathEscape(captureID), retryable: true}, &cp)
+	return cp, err
+}

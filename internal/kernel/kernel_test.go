@@ -24,14 +24,16 @@ import (
 )
 
 type fakePP struct {
-	mu          sync.Mutex
-	keys        []string
-	orders      map[string]paypal.Order // by idempotency key
-	declineOn   map[string]bool         // idempotency keys that decline
-	ambiguous   int                     // remaining ambiguous responses
-	payouts     []paypal.PayoutBatch
-	seq         int
-	notApproved bool
+	mu            sync.Mutex
+	keys          []string
+	orders        map[string]paypal.Order // by idempotency key
+	declineOn     map[string]bool         // idempotency keys that decline
+	ambiguous     int                     // remaining ambiguous responses
+	payouts       []paypal.PayoutBatch
+	seq           int
+	notApproved   bool
+	pendingFirst  bool
+	captureStatus string
 }
 
 func newFakePP() *fakePP {
@@ -60,7 +62,11 @@ func (f *fakePP) completed(spec paypal.OrderSpec) paypal.Order {
 			Captures []paypal.Capture `json:"captures"`
 		} `json:"payments"`
 	}, 1)
-	o.PurchaseUnits[0].Payments.Captures = []paypal.Capture{{ID: fmt.Sprintf("CAP%013d", f.seq), Status: "COMPLETED",
+	capStatus := "COMPLETED"
+	if f.pendingFirst {
+		capStatus = "PENDING"
+	}
+	o.PurchaseUnits[0].Payments.Captures = []paypal.Capture{{ID: fmt.Sprintf("CAP%013d", f.seq), Status: capStatus,
 		Amount: paypal.Amount{CurrencyCode: string(spec.Total.Currency), Value: spec.Total.Decimal()}}}
 	return o
 }
@@ -110,6 +116,12 @@ func (f *fakePP) CaptureOrder(_ context.Context, id string, opt paypal.CallOptio
 	o := f.completed(paypal.OrderSpec{Total: money.New(18600, money.USD)})
 	o.ID = id
 	return o, nil
+}
+
+func (f *fakePP) GetCapture(_ context.Context, id string) (paypal.Capture, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return paypal.Capture{ID: id, Status: f.captureStatus, Amount: paypal.Amount{CurrencyCode: "USD", Value: "150.00"}}, nil
 }
 
 func (f *fakePP) CreatePayoutBatch(_ context.Context, b paypal.PayoutBatch) (paypal.PayoutBatchResult, error) {
@@ -547,4 +559,35 @@ func TestRefundPolicy(t *testing.T) {
 		t.Fatalf("refunds must credit the envelope, captured=%d", mv.CapturedMinor)
 	}
 	h.verifyAudit(t)
+}
+
+// A PENDING capture (e.g. PENDING_REVIEW, seen live in sandbox) converges
+// by polling, without relying on webhooks.
+func TestPendingCaptureResolvedByPolling(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	m := h.mandate(t, nil)
+	h.pp.pendingFirst = true
+	d := h.propose(t, m, "supplier:bean-co", 15000)
+	it, err := h.svc.Execute(ctx, d.IntentID, ExecOptions{})
+	if err != nil || it.State != fsm.CapturePending {
+		t.Fatalf("expected CAPTURE_PENDING, got %+v %v", it, err)
+	}
+	h.pp.captureStatus = "PENDING"
+	if it, _ = h.svc.ResolvePendingCapture(ctx, d.IntentID); it.State != fsm.CapturePending {
+		t.Fatal("still-pending capture must stay pending")
+	}
+	h.pp.captureStatus = "COMPLETED"
+	if it, err = h.svc.ResolvePendingCapture(ctx, d.IntentID); err != nil || it.State != fsm.Captured {
+		t.Fatalf("expected CAPTURED, got %+v %v", it, err)
+	}
+	mv, _ := h.svc.GetMandate(ctx, m.ID)
+	if mv.ReservedMinor != 0 || mv.CapturedMinor != 15000 {
+		t.Fatalf("envelope %+v", mv)
+	}
+	var open int
+	_ = h.st.Pool.QueryRow(ctx, `SELECT count(*) FROM obligations WHERE intent_id = $1 AND state = 'OPEN'`, d.IntentID).Scan(&open)
+	if open != 1 {
+		t.Fatal("captured purchase must open a supplier obligation")
+	}
 }

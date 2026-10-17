@@ -45,6 +45,13 @@ func (s *Service) SweepOnce(ctx context.Context, cfg SweepConfig, log *slog.Logg
 			log.Info("sweep: resolved unknown", "intent", id, "state", it.State)
 		}
 	}
+	for _, id := range s.ids(ctx, `SELECT id FROM intents WHERE state = 'CAPTURE_PENDING' AND updated_at < now() - interval '30 seconds'`) {
+		if it, err := s.ResolvePendingCapture(ctx, id); err != nil {
+			log.Warn("sweep: pending capture", "intent", id, "err", err)
+		} else if it.State != "CAPTURE_PENDING" {
+			log.Info("sweep: pending capture resolved", "intent", id, "state", it.State)
+		}
+	}
 	for _, id := range s.ids(ctx, `SELECT DISTINCT mandate_id FROM obligations WHERE state = 'OPEN' AND created_at < now() - make_interval(secs => $1)`, cfg.SettleAfter.Seconds()) {
 		if res, err := s.SettleMandate(ctx, id); err != nil {
 			log.Error("sweep: settle", "mandate", id, "err", err)
