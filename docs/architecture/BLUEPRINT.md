@@ -243,7 +243,7 @@ Reservations are released on `DENIED / EXPIRED / REVOKED / FAILED`, and converte
 1a. **Format.** PayPal's guidance is *"a unique UUID on every POST request — reuse the same value on retries"*; the Orders schema accepts any 1–10,000-char string and its example value is a UUID. Keys are therefore emitted as **RFC 9562 UUIDv8** built from SHA-256 over the durable scope: UUID-shaped, deterministic, and reused verbatim on retry.
 2. **Write-ahead.** The `paypal_requests` row `(key, op, intent_id, request_body_hash, state=PENDING)` is committed **before** the HTTP call. A crash at any point is recovered by replaying with the same key.
 3. **Ambiguity is a state, not an error.** Timeout, 5xx or connection reset → `UNKNOWN` → replay with the identical key and body. If the replay is outside PayPal's retention window for that endpoint (it is finite and varies by API, so we never rely on it), fall back to lookup by our reference (`custom_id` / `invoice_id` = `intent_id`).
-4. **Defense in depth on PayPal's side.** Orders set `purchase_units[].invoice_id = intent_id`. PayPal rejects duplicate invoice IDs for a merchant, so this gives a second, server-side duplicate barrier independent of `PayPal-Request-Id`.
+4. **Defense in depth on PayPal's side (conditional).** Orders set `purchase_units[].invoice_id = intent_id`. PayPal's error reference says `DUPLICATE_INVOICE_ID` is raised when *"your account setting requires Invoice Id to be unique for each transaction"*, so this second barrier only exists if that merchant setting is on. Spike S8 verifies it on our sandbox merchant; until then, only `PayPal-Request-Id` and our ledger are relied on.
 5. **Per-call header injection.** `internal/paypal.Do(ctx, op Operation)`: `Operation` carries its own `IdempotencyKey`. The client has **no** client-level request-id field. The `#98` bug is unrepresentable.
 
 ### 6.2 Derivation table
@@ -423,6 +423,8 @@ sequenceDiagram
    - `VAULT.PAYMENT-TOKEN.DELETED` → **mandate auto-paused**: the payer revoked consent inside PayPal itself.
 
    Then: Transitions that would move a state backwards are ignored and audited as `STALE_EVENT`, so out-of-order delivery is safe.
+**Registration.** One webhook per environment (the hosted Render URL, plus at most one for a local dev tunnel). That uses 2 of the dashboard's 10 slots. It is registered programmatically with `paypal.Client.EnsureWebhook(url, paypal.SubscribedEvents)`, which is idempotent and patches the event list if it drifts. The returned webhook ID is stored as `PAYPAL_WEBHOOK_ID` and is required by `verify-webhook-signature`. PayPal retries non-2xx deliveries up to 25 times over 3 days (webhooks overview).
+
 4. **Reconcile.** The sweeper runs every 2 minutes. It GETs every intent in a non-terminal state older than 5 minutes from PayPal, and converges the ledger to PayPal's state. Webhooks are treated as hints; this sweeper is how the ledger converges.
 
 ---
@@ -544,7 +546,7 @@ sequenceDiagram
 | 0:40–1:15 | Stock drop → Procure agent: Channel3 benchmark, A2A RFQ to 3 suppliers, negotiation | Negotiation timeline widget |
 | 1:15–1:30 | Supplier #3's listing contains an injection, so the agent proposes paying an unlisted account → **`PAYEE_NOT_ALLOWED`** | Decision Stream row flashes red |
 | 1:30–2:05 | Approved $186 quote → token minted → vault charge **declined (sandbox negative test)** → phone buzzes → approve → captured → supplier paid via Payouts | Phone + console split screen |
-| 2:05–2:25 | Mesh micro-agents settled in one netted payout batch; chain integrity ✓ | Net Positions + Chain widgets |
+| 2:05–2:25 | Mesh micro-agents settled in one netted payout batch; chain integrity verified | Net Positions + Chain widgets |
 | 2:25–2:40 | Auditor agent: "show everything blocked today" → Studio builds widget live | AG Studio agent |
 | 2:40–2:50 | Close: "Signed authority for autonomous commerce." | Architecture slide (5 s max) |
 
@@ -558,8 +560,9 @@ sequenceDiagram
 | S2 | ~~Orders v2 create with `vault_id` behavior~~ **Resolved by docs**: charges immediately (`COMPLETED`) | — | — |
 | S3 | AG Studio data-source + Studio Agent Framework | Custom widget + agent round-trip in scratch app | Plain AG Grid Enterprise + AG Charts |
 | S4 | `CHECKOUT.ORDER.APPROVED` delivery to Render URL + `verify-webhook-signature` returns `SUCCESS` | Verified event in DB | Webhook simulator for wiring only (simulated events are for testing delivery) |
-| S5 | `PayPal-Mock-Response` INSTRUMENT_DECLINED on vault order create (header supported on create per docs) | Deterministic 422 | Mock on the recovery order's capture call (pattern shown in PayPal's official sample) |
+| S5 | ~~Mocked INSTRUMENT_DECLINED on order create~~ **Resolved live (V22)** | — | — |
 | S6 | Payouts enabled on our sandbox app (PayPal: *"Access requires approval via the PayPal Developer Dashboard"*) + payouts to sandbox business emails | Item `SUCCEEDED` webhook | Poll `GET /v1/payments/payouts/{id}`; if Payouts is unavailable: a standard order with `purchase_units[].payee.email_address` = supplier (field documented in the Orders v2 schema). Whether a **vaulted** charge may target a different payee is *not* documented, so this fallback needs payer approval per settlement and degrades autonomy to co-sign |
+| S8 | Does our sandbox merchant reject a second order with the same `invoice_id`? | `DUPLICATE_INVOICE_ID` on the second create | Rely on `PayPal-Request-Id` + ledger `UNIQUE(intent_id)` only |
 | S7 | A2A Go SDK maturity vs. hand-rolled JSON-RPC over HTTPS | Agent card + task round-trip | Minimal hand-rolled A2A subset, pinned to a spec version |
 
 ---
@@ -583,23 +586,27 @@ Every PayPal-specific claim this design depends on, the source it was checked ag
 
 | # | Claim | Status | Source |
 |---|---|---|---|
-| V1 | `PayPal-Request-Id` on every POST; reuse the same value on retries; UUID format | ✅ Docs | PayPal best-practices skill `authentication.md`; Orders v2 schema (`paypal_request_id`: string 1–10,000, example UUID) |
-| V2 | Vault without purchase: client token, `VAULT_WITHOUT_PAYMENT`, `createPayPalSavePaymentSession`, setup token → payment token request bodies | ✅ Official sample | [`paypal-examples/v6-web-sdk-sample-integration`](https://github.com/paypal-examples/v6-web-sdk-sample-integration) (`savePayment/app.js`, `vaultRouteHandler.ts`); skill `js-sdk-v6.md` |
-| V3 | Create order with `payment_source.paypal.vault_id` charges immediately (`COMPLETED`) | ✅ Official sample | `savedPaymentMethods/app.js` comment in the same repo |
-| V4 | `stored_credential{payment_initiator: MERCHANT, usage_pattern: IMMEDIATE}` on PayPal wallet vault orders | ✅ Schema | [Orders v2 schema](https://developer.paypal.com/api/orders/v2/schema.yaml): `paypal_wallet_stored_credential`, `payment_initiator`, `charge_pattern` |
-| V5 | `INSTRUMENT_DECLINED` is a create-order 422; `DUPLICATE_INVOICE_ID`, `NOT_ENABLED_TO_VAULT_PAYMENT_SOURCE` exist | ✅ Docs | [Orders v2 errors](https://developer.paypal.com/api/rest/reference/orders/v2/errors/) |
-| V6 | `PayPal-Mock-Response` supported on Orders v2 create/capture | ✅ Docs | [Negative testing: request headers](https://developer.paypal.com/tools/sandbox/negative-testing/request-headers/) |
-| V7 | On `INSTRUMENT_DECLINED`: prompt for a different method, do not auto-retry | ✅ Docs | Skill `js-sdk-v6.md` best practice #6; RulesHub `standard-checkout/snippets/javascript/error-handling.md` |
-| V8 | Webhooks verified via `POST /v1/notifications/verify-webhook-signature`; 200 within 30 s; explicit event types; dedupe by event id | ✅ Docs | Skill `webhooks.md`; RulesHub `standard-checkout/snippets/javascript/webhooks.md` |
-| V9 | Webhook event names used in §7.6 | ✅ Docs | [Event names](https://developer.paypal.com/api/rest/webhooks/event-names/) (fetched 2026-10-17) |
-| V10 | Payouts: `sender_batch_id` rejected if reused within 30 days; reuse `sender_item_id` on retries; 400 POST/min; $20k item max | ✅ Docs | [Payouts v1 schema](https://developer.paypal.com/api/payments.payouts-batch/v1/schema.yaml); skill `payouts.md` |
-| V11 | Payouts access requires approval in the Developer Dashboard | ⚠️ Sandbox check (S6) | Skill `payouts.md` |
-| V12 | Agent Ready delegated tokens are early access, by application only | ✅ Docs | Skill `agentic-commerce.md` |
-| V13 | PayPal MCP: prefer MCP tools in agent contexts, but use REST for full control over request structure; commerce tools need `x-feature-flags: commerce:true` | ✅ Docs | Skill `mcp-tools.md` |
-| V14 | `agent-toolkit#98` open, PR #108 unmerged, PR #91 closed unmerged, `paypal-mcp-server#7` open | ✅ Live GitHub (2026-10-17) | `gh issue/pr view` |
-| V15 | OAuth: cache the token, refresh using `expires_in` (do not assume a fixed lifetime) | ✅ Docs | Skill `authentication.md` |
-| V16 | Vaulted charge to a **different** payee (`payee.merchant_id`) | ❌ Not documented for standard apps | Multiparty guide shows it only with partner headers (`usage_type: PLATFORM`); out of scope (D2) |
-| V17 | Log `debug_id` from every error; retry only 429/5xx and only with idempotency keys | ✅ Docs | RulesHub error-handling; skill pre-delivery checklist |
-| V18 | Sandbox app scopes include `vault/payment-tokens/readwrite` and `payments/payouts`; vault setup token creation works | ✅ Live sandbox (2026-10-17) | `POST /v1/oauth2/token` scope list; `POST /v3/vault/setup-tokens` → `PAYER_ACTION_REQUIRED` with `approve` link |
-| V19 | Payouts from a non-US sandbox business account fail with `PAYOUT_NOT_AVAILABLE`; **resolved** with a US sandbox business account + new Merchant app ("Payment capabilities" → *Save payment methods* + *Payouts* ticked) | ✅ Live sandbox (2026-10-17): batch `TV8C3UG5XB766` → `SUCCESS`, $1.00 delivered to supplier A | [PayPal country/feature list](https://developer.paypal.com/docs/payouts/standard/reference/country-feature/) |
-| V20 | Reusing a `sender_batch_id` is rejected (`USER_BUSINESS_ERROR`); each payout item carried a **$0.25 fee** in sandbox, so micro-obligations must be netted per payee before paying out (§7.4) | ✅ Live sandbox (2026-10-17) | `GET /v1/payments/payouts/TV8C3UG5XB766` (`payout_item_fee`) |
+| V1 | `PayPal-Request-Id` on every POST; reuse the same value on retries; UUID format | Verified: Docs | PayPal best-practices skill `authentication.md`; Orders v2 schema (`paypal_request_id`: string 1–10,000, example UUID) |
+| V2 | Vault without purchase: client token, `VAULT_WITHOUT_PAYMENT`, `createPayPalSavePaymentSession`, setup token → payment token request bodies | Verified: Official sample | [`paypal-examples/v6-web-sdk-sample-integration`](https://github.com/paypal-examples/v6-web-sdk-sample-integration) (`savePayment/app.js`, `vaultRouteHandler.ts`); skill `js-sdk-v6.md` |
+| V3 | Create order with `payment_source.paypal.vault_id` charges immediately (`COMPLETED`) | Verified: Official sample | `savedPaymentMethods/app.js` comment in the same repo |
+| V4 | `stored_credential{payment_initiator: MERCHANT, usage_pattern: IMMEDIATE}` on PayPal wallet vault orders | Verified: Schema | [Orders v2 schema](https://developer.paypal.com/api/orders/v2/schema.yaml): `paypal_wallet_stored_credential`, `payment_initiator`, `charge_pattern` |
+| V5 | `INSTRUMENT_DECLINED` is a create-order 422; `DUPLICATE_INVOICE_ID`, `NOT_ENABLED_TO_VAULT_PAYMENT_SOURCE` exist | Verified: Docs | [Orders v2 errors](https://developer.paypal.com/api/rest/reference/orders/v2/errors/) |
+| V6 | `PayPal-Mock-Response` supported on Orders v2 create/capture | Verified: Docs | [Negative testing: request headers](https://developer.paypal.com/tools/sandbox/negative-testing/request-headers/) |
+| V7 | On `INSTRUMENT_DECLINED`: prompt for a different method, do not auto-retry | Verified: Docs | Skill `js-sdk-v6.md` best practice #6; RulesHub `standard-checkout/snippets/javascript/error-handling.md` |
+| V8 | Webhooks verified via `POST /v1/notifications/verify-webhook-signature`; 200 within 30 s; explicit event types; dedupe by event id | Verified: Docs | Skill `webhooks.md`; RulesHub `standard-checkout/snippets/javascript/webhooks.md` |
+| V9 | Webhook event names used in §7.6 | Verified: Docs | [Event names](https://developer.paypal.com/api/rest/webhooks/event-names/) (fetched 2026-10-17) |
+| V10 | Payouts: `sender_batch_id` rejected if reused within 30 days; reuse `sender_item_id` on retries; 400 POST/min; $20k item max | Verified: Docs | [Payouts v1 schema](https://developer.paypal.com/api/payments.payouts-batch/v1/schema.yaml); skill `payouts.md` |
+| V11 | Payouts access requires approval in the Developer Dashboard | Open: Sandbox check (S6) | Skill `payouts.md` |
+| V12 | Agent Ready delegated tokens are early access, by application only | Verified: Docs | Skill `agentic-commerce.md` |
+| V13 | PayPal MCP: prefer MCP tools in agent contexts, but use REST for full control over request structure; commerce tools need `x-feature-flags: commerce:true` | Verified: Docs | Skill `mcp-tools.md` |
+| V14 | `agent-toolkit#98` open, PR #108 unmerged, PR #91 closed unmerged, `paypal-mcp-server#7` open | Verified: Live GitHub (2026-10-17) | `gh issue/pr view` |
+| V15 | OAuth: cache the token, refresh using `expires_in` (do not assume a fixed lifetime) | Verified: Docs | Skill `authentication.md` |
+| V16 | Vaulted charge to a **different** payee (`payee.merchant_id`) | Not supported: Not documented for standard apps | Multiparty guide shows it only with partner headers (`usage_type: PLATFORM`); out of scope (D2) |
+| V17 | Log `debug_id` from every error; retry only 429/5xx and only with idempotency keys | Verified: Docs | RulesHub error-handling; skill pre-delivery checklist |
+| V18 | Sandbox app scopes include `vault/payment-tokens/readwrite` and `payments/payouts`; vault setup token creation works | Verified: Live sandbox (2026-10-17) | `POST /v1/oauth2/token` scope list; `POST /v3/vault/setup-tokens` → `PAYER_ACTION_REQUIRED` with `approve` link |
+| V19 | Payouts from a non-US sandbox business account fail with `PAYOUT_NOT_AVAILABLE`; **resolved** with a US sandbox business account + new Merchant app ("Payment capabilities" → *Save payment methods* + *Payouts* ticked) | Verified: Live sandbox (2026-10-17): batch `TV8C3UG5XB766` → `SUCCESS`, $1.00 delivered to supplier A | [PayPal country/feature list](https://developer.paypal.com/docs/payouts/standard/reference/country-feature/) |
+| V20 | Reusing a `sender_batch_id` is rejected (`USER_BUSINESS_ERROR`); each payout item carried a **$0.25 fee** in sandbox, so micro-obligations must be netted per payee before paying out (§7.4) | Verified: Live sandbox (2026-10-17) | `GET /v1/payments/payouts/TV8C3UG5XB766` (`payout_item_fee`) |
+| V21 | Replaying `POST /v3/vault/setup-tokens` with the same derived UUIDv8 `PayPal-Request-Id` returns the same setup token: PayPal honours our per-operation keys | Verified: Live sandbox (2026-10-17) | `internal/paypal/live_test.go` `TestLiveSetupTokenAwaitsPayerApproval` |
+| V22 | `PayPal-Mock-Response: {"mock_application_codes":"INSTRUMENT_DECLINED"}` on Orders v2 create returns 422 `INSTRUMENT_DECLINED` (resolves S5) | Verified: Live sandbox (debug_id `70c28ae654da`) | `TestLiveMockedDeclineOnCreate` |
+| V23 | Approval order: `PAYER_ACTION_REQUIRED` with a `payer-action` link; amount round-trips exactly; capture before approval fails with `ORDER_NOT_APPROVED` (definitive, not ambiguous) | Verified: Live sandbox | `TestLiveApprovalOrderRoundTrip` |
+| V24 | Browser client token: `response_type=client_token` without `domains[]` works (900 s TTL); `domains[]=localhost` is rejected as `invalid_domain` | Verified: Live sandbox | `TestLiveBrowserClientToken` |
