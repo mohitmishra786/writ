@@ -12,6 +12,7 @@ Writ does not stop a model from being fooled by prompt injection. It bounds what
 
 | | |
 |---|---|
+| Demo video (2 min) | https://youtu.be/AgY9k35Es14 |
 | Operator console | https://mandate-console.onrender.com |
 | API | https://mandate-api-1f5y.onrender.com (`/healthz`, `/v1/audit/verify`) |
 | MCP endpoint | `https://mandate-api-1f5y.onrender.com/mcp/<mandate_id>` |
