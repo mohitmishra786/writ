@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log/slog"
 	"net"
@@ -85,6 +86,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/paypal/return", s.paypalReturn)
 	mux.HandleFunc("GET /v1/paypal/cancel", s.paypalCancel)
 	mux.HandleFunc("GET /a/{code}", s.shortLink)
+	mux.HandleFunc("GET /vault/return", s.vaultReturn)
+	mux.HandleFunc("GET /vault/cancel", s.plainPage("Saving your PayPal account was cancelled. Nothing was changed."))
+	mux.HandleFunc("GET /approved", s.approvedPage)
 	for p, h := range s.extra {
 		mux.Handle(p, h)
 	}
@@ -578,4 +582,45 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// vaultReturn is where PayPal sends the payer after approving vault setup.
+// PayPal appends approval_token_id (the setup token ID; verified live,
+// ledger V32), which identifies the mandate; the vault link is completed
+// here so no separate call is needed.
+func (s *Server) vaultReturn(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("approval_token_id")
+	if token == "" {
+		s.plainPage("Missing approval token.")(w, r)
+		return
+	}
+	mandateID, err := s.svc.MandateBySetupToken(r.Context(), token)
+	if err != nil {
+		s.plainPage("This approval link does not match a mandate.")(w, r)
+		return
+	}
+	v, err := s.svc.CompleteVaultSetup(r.Context(), mandateID)
+	if err != nil {
+		s.log.Error("vault return", "err", err, "mandate", mandateID)
+		s.plainPage("PayPal approval was received but linking failed; it will need to be retried.")(w, r)
+		return
+	}
+	s.plainPage(fmt.Sprintf("Your PayPal account is saved. Mandate %s is %s. You can close this tab.", v.ID, v.Status))(w, r)
+}
+
+func (s *Server) approvedPage(w http.ResponseWriter, r *http.Request) {
+	state := r.URL.Query().Get("state")
+	msg := "Payment approval received (state: " + state + "). You can close this tab."
+	if state == "cancelled" {
+		msg = "Payment approval was cancelled. Nothing was charged."
+	}
+	s.plainPage(msg)(w, r)
+}
+
+// plainPage renders a minimal HTML page (no scripts) for PayPal redirects.
+func (s *Server) plainPage(msg string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprintf(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mandate</title></head><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;color:#14213d"><h1 style="font-size:1.25rem">Mandate</h1><p>%s</p></body></html>`, html.EscapeString(msg))
+	}
 }

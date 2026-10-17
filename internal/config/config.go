@@ -103,7 +103,9 @@ func Load(ctx context.Context, log *slog.Logger) (*Runtime, error) {
 		// an https public URL (Render, or a tunnel in local development).
 		log.Warn("PUBLIC_BASE_URL is not https: PayPal buyer approval (decline recovery) will fail until it is", "public_base_url", public)
 	}
-	console := strings.TrimRight(env("CONSOLE_URL", "http://localhost:3000"), "/")
+	// Until the console is deployed separately, the API serves the minimal
+	// return pages itself, so the console URL defaults to the public URL.
+	console := strings.TrimRight(env("CONSOLE_URL", public), "/")
 	hub := api.NewHub()
 	svc := kernel.New(st, pp, minter, verifier, notifier, hub, kernel.Config{
 		PublicBaseURL: public,

@@ -225,3 +225,13 @@ func (s *Service) finishRequest(ctx context.Context, key string, callErr error, 
 	raw, _ := json.Marshal(resp)
 	_, _ = s.store.Pool.Exec(ctx, `UPDATE paypal_requests SET state = $2, debug_id = nullif($3,''), response = $4, updated_at = now() WHERE idempotency_key = $1`, key, state, debug, raw)
 }
+
+// MandateBySetupToken finds the mandate that issued a vault setup token.
+func (s *Service) MandateBySetupToken(ctx context.Context, setupTokenID string) (string, error) {
+	var id string
+	err := s.store.Pool.QueryRow(ctx, `SELECT id FROM mandates WHERE setup_token_id = $1`, setupTokenID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return id, err
+}
