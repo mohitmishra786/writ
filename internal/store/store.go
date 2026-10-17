@@ -32,16 +32,36 @@ type Store struct {
 	checkpointEvery int64
 }
 
+// Open connects and waits for the database to accept connections, retrying
+// with backoff for up to about 90 seconds. Seen live on Render: a newly
+// provisioned database refused connections briefly right after the
+// pre-deploy migration had succeeded.
 func Open(ctx context.Context, url string, signer ed25519.PrivateKey) (*Store, error) {
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
 		return nil, err
 	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, err
+	delay := time.Second
+	deadline := time.Now().Add(90 * time.Second)
+	for {
+		pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		err = pool.Ping(pingCtx)
+		cancel()
+		if err == nil {
+			return &Store{Pool: pool, signer: signer, checkpointEvery: 50}, nil
+		}
+		if time.Now().Add(delay).After(deadline) || ctx.Err() != nil {
+			pool.Close()
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			pool.Close()
+			return nil, ctx.Err()
+		case <-time.After(delay):
+		}
+		delay = min(delay*2, 15*time.Second)
 	}
-	return &Store{Pool: pool, signer: signer, checkpointEvery: 50}, nil
 }
 
 func (s *Store) Close() { s.Pool.Close() }
