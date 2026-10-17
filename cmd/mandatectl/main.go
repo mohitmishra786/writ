@@ -25,6 +25,10 @@ const usage = `mandatectl <command>
   webhooks list               list PayPal webhooks for this app
   webhooks delete <id>        delete a PayPal webhook
   verify                      verify the whole audit hash chain and checkpoint signatures
+  demo-reset [-valid-days N] [-stock N]
+                              start a fresh demo: pause the active vaulted mandates, create a
+                              new one with the same policy and the owner's saved PayPal account,
+                              and set pitcher stock so the agent has something to buy
 `
 
 func main() {
@@ -101,6 +105,9 @@ func run(args []string) error {
 			return fmt.Errorf("unknown webhooks subcommand %q", args[1])
 		}
 		return nil
+
+	case "demo-reset":
+		return demoReset(ctx, args[1:])
 
 	case "verify":
 		st, err := openStore(ctx)

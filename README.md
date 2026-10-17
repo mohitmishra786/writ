@@ -8,6 +8,25 @@ Mandate is the financial kernel that sits between any agent and PayPal. A human 
 
 Mandate does not stop a model from being fooled by prompt injection. It bounds what a fooled model can do.
 
+## Try it (hosted, PayPal sandbox)
+
+| | |
+|---|---|
+| Operator console | https://mandate-console.onrender.com |
+| API | https://mandate-api-1f5y.onrender.com (`/healthz`, `/v1/audit/verify`) |
+| MCP endpoint | `https://mandate-api-1f5y.onrender.com/mcp/<mandate_id>` |
+
+The scenario: a café's procurement agent keeps frothing pitchers in stock. The owner signed a mandate for it: $600 a week, $250 per order, co-sign above $200, two allowlisted suppliers. In the console's left sidebar:
+
+1. **Run procurement agent.** The agent reads the stock gap, checks the live market price on Channel3, negotiates with two supplier agents over A2A (signed quotes), and proposes a purchase. The kernel checks the mandate, reserves funds, mints a single-use capability and charges the owner's saved PayPal account. Follow it in **Activity**.
+2. **Simulate compromised agent.** An agent tries to send $4,800 to `attacker:refund-desk`. The kernel blocks it before any credential exists (`PAYEE_NOT_ALLOWED`); the Overview shows the blocked amount and reason.
+3. **Card declines at checkout**, then **Run procurement agent.** PayPal declines the charge (sandbox negative testing). Mandate does not retry the card: a banner shows a PayPal approval link and QR code, the owner picks another funding source on PayPal's page, and the purchase completes. Sandbox buyer credentials for this step are in the Devpost submission's testing instructions.
+4. **Settle suppliers now.** Obligations are netted into one PayPal Payouts batch per settlement run; the Settlement page shows the batch and item IDs.
+5. **Audit chain.** Every state change is SHA-256 hash-chained and checkpointed with Ed25519 signatures. The header badge re-verifies the whole chain.
+6. **Ask AI.** AG Studio's assistant (Claude Haiku 5.5) answers questions about the ledger and builds widgets, for example "How many intents were blocked, and why?" or "Add a bar chart of captured spend by payee." **AI usage** shows every model call it made.
+
+Purchases do not simulate delivery, so repeated runs use up the weekly envelope and later purchases are blocked (`ENVELOPE_EXCEEDED`); that is the mandate working. `mandatectl demo-reset` starts a clean demo (see Deploy).
+
 ## What runs today
 
 | Area | Status | Where |
@@ -22,7 +41,8 @@ Mandate does not stop a model from being fooled by prompt injection. It bounds w
 | Supplier agents over A2A 1.0 (signed quotes) | Done, tested | `internal/mesh` |
 | Live market benchmark from Channel3 | Done, live verified | `internal/channel3` |
 | MCP server with PayPal Agent Toolkit tool names | Done, live verified | `internal/mcpserver` |
-| Operator console (Next.js + AG Studio) | In progress | `web/console` |
+| Operator console (Vite, React, AG Studio 3.0), live over SSE | Done, hosted | `web/console` |
+| AI assistant for the console: Claude Haiku 5.5, with Gemini, NVIDIA and Groq as fallbacks; every call recorded | Done, hosted | `internal/api/ai.go`, `internal/api/ai_anthropic.go` |
 
 Every PayPal behaviour the code depends on is listed with its source (official docs, the v6 sample integration, OpenAPI schemas, or a live sandbox call) in [docs/architecture/BLUEPRINT.md §16](docs/architecture/BLUEPRINT.md).
 
@@ -98,20 +118,38 @@ MANDATE_CHANNEL3_IT=1 go test ./internal/channel3 -run Live
 
 Integration tests prove, against real Postgres: concurrent spends never exceed the envelope; illegal state transitions are rejected by a database trigger; ambiguous PayPal outcomes resolve by replaying the same idempotency key with exactly one capture; capabilities are single use; equal partial refunds never share an idempotency key; the audit chain detects tampering, deletion and rewritten history.
 
-## Deploy
-
-`render.yaml` is a Render Blueprint: one Go web service and one Postgres database, with secrets prompted in the Render Dashboard. After the first deploy, register the PayPal webhook:
+### Run the console locally
 
 ```bash
-go run ./cmd/mandatectl webhooks ensure https://<your-service>.onrender.com/v1/paypal/webhooks
-# set the printed PAYPAL_WEBHOOK_ID in the Render Dashboard
+cd web/console
+pnpm install
+VITE_API_BASE=http://localhost:8080 pnpm dev      # http://localhost:3000; set ALLOWED_ORIGINS=http://localhost:3000 for the API
 ```
+
+## Deploy
+
+`render.yaml` is a Render Blueprint: the Go API, the console as a static site, and one Postgres database, with secrets prompted in the Render Dashboard. After the first deploy:
+
+```bash
+# register the PayPal webhook, then set the printed PAYPAL_WEBHOOK_ID in the Render Dashboard
+go run ./cmd/mandatectl webhooks ensure https://<api-service>.onrender.com/v1/paypal/webhooks
+```
+
+Set `CONSOLE_URL` on the API to the console's URL (CORS) and at least one AI key (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `NVIDIA_API_KEY` or `GROQ_API_KEY`) for the assistant.
+
+### Reset the demo
+
+```bash
+render jobs create <api-service-id> --start-command "./bin/mandatectl demo-reset"
+```
+
+`demo-reset` pauses the active mandate (audited as `MANDATE_PAUSED`, reason "superseded by demo reset"), creates a new one with the same policy, a fresh 90-day validity window and an empty envelope, activates it with the owner's saved PayPal account, and sets pitcher stock to 2 of 8. History is kept; the audit chain stays valid.
 
 ## Sponsor tools
 
-- **AG Grid / AG Studio**: the operator console (in progress).
+- **AG Grid / AG Studio**: the operator console is an AG Studio report (KPI tiles, charts, grids over nine data sources) with Studio's AI assistant wired to Mandate's server-side model proxy.
 - **Channel3**: live retail price benchmark the procurement agent negotiates against.
-- **Render**: hosting (`render.yaml`).
+- **Render**: hosting for the API, the console and Postgres (`render.yaml`).
 - **APIMatic**: not used yet (planned: the APIMatic Context Plugin for PayPal during development).
 
 ## License
