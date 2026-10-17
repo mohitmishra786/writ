@@ -30,6 +30,34 @@ The scenario: a café's procurement agent keeps frothing pitchers in stock. The 
 
 Purchases do not simulate delivery, so repeated runs use up the weekly envelope and later purchases are blocked (`ENVELOPE_EXCEEDED`); that is the mandate working. `mandatectl demo-reset` starts a clean demo (see Deploy).
 
+## How Writ uses PayPal and AI
+
+**PayPal developer platform (sandbox)**
+
+| PayPal tool | What it does in Writ |
+|---|---|
+| OAuth 2.0 | Client-credentials token for every REST call, cached until expiry. |
+| Vault v3 | Saves the owner's PayPal account without a purchase (setup token, then payment token), so agents never hold a credential. |
+| Orders v2 | Merchant-initiated charge of the saved account; on `INSTRUMENT_DECLINED` a new order returns the payer-action approval link used for recovery. |
+| Payments v2 | Capture lookups and capture refunds, never beyond the captured amount. |
+| Payouts v1 | Netted supplier settlement: one payout item per supplier per batch. |
+| Webhooks v1 | Every event is verified with PayPal's signature API and applied idempotently. |
+| `PayPal-Request-Id` | Deterministic RFC 9562 UUIDv8 keys derived from the operation, so retries are safe. |
+| Sandbox negative testing | `PayPal-Mock-Response` forces a decline to demonstrate recovery. |
+| Agent Toolkit tool names | Writ's MCP server mirrors them, so existing agents keep their code. |
+
+**AI tools**
+
+| AI tool | What it does in Writ |
+|---|---|
+| Groq, `openai/gpt-oss-120b` | The procurement agent: tool calls for stock, market price, supplier discovery, quote negotiation and the purchase proposal. |
+| Groq, `openai/gpt-oss-20b` | Supplier agents write the note explaining their quote; prices are computed in code. |
+| Claude Haiku 5.5 | Powers Clerk, the console's assistant (native Messages API, strict tool schemas, prompt caching). |
+| Gemini 3.8 Flash, NVIDIA API catalog, Groq | Ordered fallbacks for Clerk when a provider is rate limited or down. |
+| Channel3 | Live product and price benchmark the agent negotiates against. |
+
+A longer write-up with the design and its invariants: [docs/devpost/writ-devpost.pdf](docs/devpost/writ-devpost.pdf).
+
 ## What runs today
 
 | Area | Status | Where |
