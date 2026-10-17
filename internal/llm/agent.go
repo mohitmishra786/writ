@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Tool is a function the model may call. Handlers receive untrusted
@@ -58,9 +59,19 @@ func (a Agent) Run(ctx context.Context, user string) (Result, error) {
 	msgs := []Message{{Role: "system", Content: a.System}, {Role: "user", Content: user}}
 	var res Result
 	for range maxSteps {
-		resp, err := a.Client.Complete(ctx, Request{
-			Model: a.Model, Messages: msgs, Tools: specs, ReasoningEffort: a.ReasoningEffort,
-		})
+		var resp Response
+		var err error
+		// Groq validates generated tool arguments server-side and answers 400
+		// "Tool call validation failed" when the model omits a required
+		// field. That is a sampling error, so resample a bounded number of times.
+		for attempt := 0; ; attempt++ {
+			resp, err = a.Client.Complete(ctx, Request{
+				Model: a.Model, Messages: msgs, Tools: specs, ReasoningEffort: a.ReasoningEffort,
+			})
+			if err == nil || attempt >= 2 || !isToolValidationError(err) {
+				break
+			}
+		}
 		if err != nil {
 			return res, err
 		}
@@ -97,4 +108,9 @@ func (a Agent) invoke(ctx context.Context, byName map[string]Tool, call ToolCall
 		return "", errors.New("tool arguments are not valid JSON")
 	}
 	return t.Handler(ctx, args)
+}
+
+func isToolValidationError(err error) bool {
+	var ae *APIError
+	return errors.As(err, &ae) && ae.Status == 400 && strings.Contains(strings.ToLower(ae.Message), "tool call validation failed")
 }

@@ -229,3 +229,48 @@ func (s *Service) applyPayoutItem(ctx context.Context, batchID, receiver, payout
 		return nil
 	})
 }
+
+// ReopenFailedBatches handles batches PayPal rejected definitively (status
+// ERROR: no payout was created, so nothing was paid). Their obligations are
+// reopened and their intents marked SETTLE_FAILED, so the next sweep pays
+// again under a fresh sender_batch_id. UNKNOWN batches are not reopened: a
+// payout may exist, and PayPal's sender_batch_id dedupe protects a resend.
+func (s *Service) ReopenFailedBatches(ctx context.Context) (int, error) {
+	n := 0
+	for _, batchID := range s.ids(ctx, `SELECT id FROM payout_batches WHERE status = 'ERROR'`) {
+		err := s.store.Tx(ctx, func(tx pgx.Tx) error {
+			rows, err := tx.Query(ctx, `UPDATE obligations SET state = 'OPEN', batch_id = NULL, updated_at = now() WHERE batch_id = $1 AND state = 'BATCHED' RETURNING intent_id`, batchID)
+			if err != nil {
+				return err
+			}
+			var intents []string
+			for rows.Next() {
+				var id string
+				if err := rows.Scan(&id); err != nil {
+					rows.Close()
+					return err
+				}
+				intents = append(intents, id)
+			}
+			rows.Close()
+			for _, id := range intents {
+				it, err := s.loadIntent(ctx, tx, "id", id, true)
+				if err != nil {
+					return err
+				}
+				if it.State == fsm.Settling {
+					if err := s.transition(ctx, tx, &it, fsm.SettleFailed, map[string]any{"batch_id": batchID, "reason": "payout batch rejected"}); err != nil {
+						return err
+					}
+				}
+			}
+			_, err = tx.Exec(ctx, `UPDATE payout_batches SET status = 'FAILED', updated_at = now() WHERE id = $1`, batchID)
+			return err
+		})
+		if err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}

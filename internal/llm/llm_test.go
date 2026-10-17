@@ -173,3 +173,18 @@ func TestLiveGroqToolCall(t *testing.T) {
 		t.Fatal("model made no tool call")
 	}
 }
+
+func TestToolValidationErrorIsResampled(t *testing.T) {
+	c := fakeServer(t, func(w http.ResponseWriter, _ map[string]any, n int32) {
+		if n == 1 {
+			w.WriteHeader(400)
+			_, _ = w.Write([]byte(`{"error":{"message":"Tool call validation failed: parameters for tool x did not match schema","type":"invalid_request_error"}}`))
+			return
+		}
+		reply(w, map[string]any{"role": "assistant", "content": "ok"}, "stop")
+	})
+	res, err := Agent{Client: c, Model: "m", System: "s"}.Run(context.Background(), "x")
+	if err != nil || res.Final != "ok" {
+		t.Fatalf("got %+v %v", res, err)
+	}
+}

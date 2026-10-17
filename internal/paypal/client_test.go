@@ -360,3 +360,27 @@ func TestEnsureWebhookIsIdempotent(t *testing.T) {
 		}
 	}
 }
+
+// Payouts v1 names the money field "currency", unlike Orders v2
+// ("currency_code"). Sending currency_code fails with VALIDATION_ERROR
+// "may not be null" (seen live, debug_id f862566f68a8c).
+func TestPayoutAmountUsesCurrencyField(t *testing.T) {
+	f, c := newFake(t, Sandbox, func(w http.ResponseWriter, _ *http.Request, _ []byte) {
+		writeJSON(w, 201, map[string]any{"batch_header": map[string]any{"payout_batch_id": "PB1", "batch_status": "PENDING"}})
+	})
+	_, err := c.CreatePayoutBatch(context.Background(), PayoutBatch{SenderBatchID: "mb-1",
+		Items: []PayoutItem{{ReceiverEmail: "a@example.com", Amount: usd(14608), SenderItemID: "i1"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Items []struct {
+			Amount map[string]string `json:"amount"`
+		} `json:"items"`
+	}
+	_ = json.Unmarshal(f.reqs()[0].Body, &body)
+	a := body.Items[0].Amount
+	if a["currency"] != "USD" || a["value"] != "146.08" || a["currency_code"] != "" {
+		t.Fatalf("payout amount must be {currency, value}, got %v", a)
+	}
+}

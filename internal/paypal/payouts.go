@@ -9,6 +9,17 @@ import (
 	"github.com/mohitmishra786/paypal-ai-hackathon/internal/money"
 )
 
+// PayoutAmount is the Payouts v1 money object, which names the currency
+// field "currency" (Orders v2 uses "currency_code").
+type PayoutAmount struct {
+	Currency string `json:"currency"`
+	Value    string `json:"value"`
+}
+
+func payoutAmountOf(m money.Money) PayoutAmount {
+	return PayoutAmount{Currency: string(m.Currency), Value: m.Decimal()}
+}
+
 type PayoutItem struct {
 	ReceiverEmail string
 	Amount        money.Money
@@ -29,16 +40,16 @@ type PayoutBatchResult struct {
 		SenderBatch   struct {
 			SenderBatchID string `json:"sender_batch_id"`
 		} `json:"sender_batch_header"`
-		Fees *Amount `json:"fees"`
+		Fees *PayoutAmount `json:"fees"`
 	} `json:"batch_header"`
 	Items []struct {
-		PayoutItemID      string  `json:"payout_item_id"`
-		TransactionStatus string  `json:"transaction_status"`
-		PayoutItemFee     *Amount `json:"payout_item_fee"`
+		PayoutItemID      string        `json:"payout_item_id"`
+		TransactionStatus string        `json:"transaction_status"`
+		PayoutItemFee     *PayoutAmount `json:"payout_item_fee"`
 		PayoutItem        struct {
-			Receiver     string `json:"receiver"`
-			Amount       Amount `json:"amount"`
-			SenderItemID string `json:"sender_item_id"`
+			Receiver     string       `json:"receiver"`
+			Amount       PayoutAmount `json:"amount"`
+			SenderItemID string       `json:"sender_item_id"`
 		} `json:"payout_item"`
 	} `json:"items"`
 }
@@ -66,7 +77,7 @@ func (c *Client) CreatePayoutBatch(ctx context.Context, b PayoutBatch) (PayoutBa
 		item := map[string]any{
 			"recipient_type": "EMAIL",
 			"receiver":       it.ReceiverEmail,
-			"amount":         amountOf(it.Amount),
+			"amount":         payoutAmountOf(it.Amount),
 			"sender_item_id": it.SenderItemID,
 		}
 		if it.Note != "" {

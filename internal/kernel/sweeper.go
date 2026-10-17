@@ -52,6 +52,11 @@ func (s *Service) SweepOnce(ctx context.Context, cfg SweepConfig, log *slog.Logg
 			log.Info("sweep: pending capture resolved", "intent", id, "state", it.State)
 		}
 	}
+	if n, err := s.ReopenFailedBatches(ctx); err != nil {
+		log.Error("sweep: reopen failed batches", "err", err)
+	} else if n > 0 {
+		log.Info("sweep: reopened rejected payout batches", "count", n)
+	}
 	for _, id := range s.ids(ctx, `SELECT DISTINCT mandate_id FROM obligations WHERE state = 'OPEN' AND created_at < now() - make_interval(secs => $1)`, cfg.SettleAfter.Seconds()) {
 		if res, err := s.SettleMandate(ctx, id); err != nil {
 			log.Error("sweep: settle", "mandate", id, "err", err)
