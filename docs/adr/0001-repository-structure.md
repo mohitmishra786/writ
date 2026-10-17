@@ -110,6 +110,12 @@ GitHub Actions on every PR:
 - `Taskfile.yml` is not added yet. The commands are listed in the README; Task will be added if the command list grows.
 - The Go `go` directive is 1.25.0, the lowest version our dependencies allow, so judges can build with an older toolchain. Render's native Go runtime always uses the latest stable Go.
 
+## Amendment (2026-10-18)
+
+- The console is Vite + React 19 + AG Studio 3.0 (a single-page operator console needs no server rendering), deployed as a Render static site from the same Blueprint.
+- `research/` and the agent tooling directories are kept out of the repository; the product, its docs and its tests are what ships.
+- The product is named Writ. Internal names (`mandated`, `mandatectl`, the Go module path) predate the name and are unchanged.
+
 ## Consequences
 
 **Positive**

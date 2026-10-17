@@ -13,3 +13,16 @@ out/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Local agent tooling and working notes (kept on disk, not part of the product)
+.agents/
+agent/
+.claude/
+.grok/
+skills-lock.json
+CLAUDE_OPUS_PROMPT.md
+research/
+docs/HACKATHON_GUIDE.md
+
+# TypeScript incremental build cache
+*.tsbuildinfo
