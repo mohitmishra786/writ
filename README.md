@@ -25,7 +25,7 @@ The scenario: a café's procurement agent keeps frothing pitchers in stock. The 
 3. **Card declines at checkout**, then **Run procurement agent.** PayPal declines the charge (sandbox negative testing). Writ does not retry the card: a banner shows a PayPal approval link and QR code, the owner picks another funding source on PayPal's page, and the purchase completes. Sandbox buyer credentials for this step are in the Devpost submission's testing instructions.
 4. **Settle suppliers now.** Obligations are netted into one PayPal Payouts batch per settlement run; the Settlement page shows the batch and item IDs.
 5. **Audit chain.** Every state change is SHA-256 hash-chained and checkpointed with Ed25519 signatures. The header badge re-verifies the whole chain.
-6. **Ask AI.** AG Studio's assistant (Claude Haiku 5.5) answers questions about the ledger and builds widgets, for example "How many intents were blocked, and why?" or "Add a bar chart of captured spend by payee." **AI usage** shows every model call it made.
+6. **Ask Clerk.** Clerk, the AG Studio assistant (powered by Claude Haiku 5.5), answers questions about the ledger and builds widgets, for example "How many intents were blocked, and why?" or "Add a bar chart of captured spend by payee." **AI usage** shows every model call it made.
 
 Purchases do not simulate delivery, so repeated runs use up the weekly envelope and later purchases are blocked (`ENVELOPE_EXCEEDED`); that is the mandate working. `mandatectl demo-reset` starts a clean demo (see Deploy).
 

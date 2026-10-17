@@ -22,9 +22,11 @@ const PAGES: { id: PageId; label: string; description: string }[] = [
 
 const EMPTY: ConsoleData = { mandate: null, intents: [], audit: [], obligations: [], inventory: [], runs: [], aiCalls: [] };
 const STUDIO_STYLE = { height: '100%', width: '100%' };
+// The AI assistant is named Clerk (a writ is issued by a clerk). Stable reference: Studio reads it once.
+const LOCALE_TEXT = { panelTitleAi: 'Clerk', aiMessageInputPlaceholder: 'Ask Clerk about the ledger...' };
 
 // In ag-studio 3.0 the AI Assistant panel is an edit-mode panel (view mode only
-// offers 'filters'). "Ask AI" opens edit mode with the assistant alone;
+// offers 'filters'). "Ask Clerk" opens edit mode with the assistant alone;
 // "Customize" opens the full editing layout. Constant objects keep Studio's
 // props referentially stable.
 type Surface = 'view' | 'ai' | 'customize';
@@ -257,7 +259,7 @@ export function App() {
               Activity{unread > 0 && <span className="badge">{unread > 99 ? '99+' : unread}</span>}
             </button>
             <button className={surface === 'ai' ? 'btn active' : 'btn'} aria-pressed={surface === 'ai'} onClick={() => setSurface((x) => (x === 'ai' ? 'view' : 'ai'))}>
-              Ask AI
+              Ask Clerk
             </button>
             <button className="btn quiet" onClick={() => setSurface((x) => (x === 'customize' ? 'view' : 'customize'))}>
               {surface === 'customize' ? 'Done' : 'Customize'}
@@ -284,7 +286,7 @@ export function App() {
 
         <div className="studio">
           {sources ? (
-            <AgStudio ref={studioRef} style={STUDIO_STYLE} data={sources} mode={surface === 'view' ? 'view' : 'edit'} panels={surface === 'customize' ? PANELS_CUSTOMIZE : PANELS_AI} initialState={initialReport} theme={mandateTheme} ai={aiSetup} />
+            <AgStudio ref={studioRef} style={STUDIO_STYLE} data={sources} mode={surface === 'view' ? 'view' : 'edit'} panels={surface === 'customize' ? PANELS_CUSTOMIZE : PANELS_AI} initialState={initialReport} theme={mandateTheme} ai={aiSetup} localeText={LOCALE_TEXT} />
           ) : (
             <div className="empty muted">Loading the ledger</div>
           )}

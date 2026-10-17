@@ -10,7 +10,7 @@ const adapter = groqAdapter(`${API_BASE}/v1/ai/responses`);
 
 // The server picks the route (Claude, then Gemini, NVIDIA and Groq as fallbacks; see
 // internal/api/ai.go), so the panel offers one entry.
-const MODELS: AgAiModel[] = [{ id: 'auto', label: 'Claude Haiku 5.5' }];
+const MODELS: AgAiModel[] = [{ id: 'auto', label: 'Clerk' }];
 
 const PROMPT_STARTERS: AgAiPromptStarter[] = [
   { label: 'What was blocked?', prompt: 'Add a grid of every blocked agent intent with its payee, amount and reasons.' },
