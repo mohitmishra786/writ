@@ -143,7 +143,11 @@ Set `CONSOLE_URL` on the API to the console's URL (CORS) and at least one AI key
 render jobs create <api-service-id> --start-command "./bin/mandatectl demo-reset"
 ```
 
-`demo-reset` pauses the active mandate (audited as `MANDATE_PAUSED`, reason "superseded by demo reset"), creates a new one with the same policy, a fresh 90-day validity window and an empty envelope, activates it with the owner's saved PayPal account, and sets pitcher stock to 2 of 8. History is kept; the audit chain stays valid.
+`demo-reset` pauses the active mandate (audited as `MANDATE_PAUSED`, reason "superseded by demo reset"), creates a new one with the same policy, a fresh 90-day validity window and an empty envelope, activates it with the owner's saved PayPal account, and sets pitcher stock to 2 of 8. History is kept; the audit chain stays valid. Then populate it with real activity through the public API (a blocked compromised agent, one purchase, one payout):
+
+```bash
+scripts/demo-seed.sh https://<api-service>.onrender.com
+```
 
 ## Sponsor tools
 
