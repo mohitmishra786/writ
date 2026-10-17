@@ -42,6 +42,7 @@ func run(log *slog.Logger) error {
 
 	srv := api.New(rt.API, rt.Kernel, rt.Store, rt.PayPal, rt.Hub, log)
 	srv.MountAgents(rt.Agents)
+	srv.MountConsole()
 	srv.Mount("/mcp/", mcpserver.Handler(mcpserver.Deps{Kernel: rt.Kernel, Store: rt.Store, Refunder: rt.PayPal, AgentID: "agent:procure-01"}))
 	go rt.Kernel.Sweep(ctx, kernel.SweepConfig{Interval: 30 * time.Second, SettleAfter: 60 * time.Second, SyncAfter: 30 * time.Second}, log)
 
