@@ -37,6 +37,12 @@
       "skillPath": "skills/bro/SKILL.md",
       "computedHash": "b651827a1c11465d79500780e53414fdccffd12ce3b640138dee2d04133a9a33"
     },
+    "channel3-api": {
+      "source": "channel3-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/channel3-api/SKILL.md",
+      "computedHash": "6319a64b6b5d5471c613df76a0596819fcdb2d7fe95a593b99d5972e560c55c1"
+    },
     "correct": {
       "source": "backnotprop/pstack",
       "sourceType": "github",
