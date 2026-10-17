@@ -37,6 +37,18 @@ services:
         value: openai/gpt-oss-120b
       - key: GROQ_MODEL_SUPPLIER
         value: openai/gpt-oss-20b
+      # Studio AI panel chain (internal/api/ai.go): Claude, then Gemini,
+      # NVIDIA and Groq as fallbacks. Each provider is optional.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: NVIDIA_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      - key: STUDIO_AI_NVIDIA_MODELS
+        value: stepfun-ai/step-5-preview,nvidia/nemotron-3-super-120b-a12b,z-ai/glm-5.3-flash
       - key: CHANNEL3_API_KEY
         sync: false
       - key: SUPPLIER_A_SEED
@@ -47,6 +59,32 @@ services:
         sync: false
       - key: SANDBOX_SUPPLIER_B_EMAIL
         sync: false
+      # The console's URL (the mandate-console static site below), allowed by
+      # CORS. Set it after the first sync, when Render has assigned the URL.
+      - key: CONSOLE_URL
+        sync: false
+
+  # Operator console (web/console): Vite + React + AG Studio, served from
+  # Render's CDN. VITE_API_BASE is compiled in, so it is set inline in the
+  # build command; pnpm is pinned to the version that wrote the lockfile.
+  - type: web
+    name: mandate-console
+    runtime: static
+    branch: main
+    rootDir: web/console
+    buildCommand: npx --yes pnpm@10.33.0 install --frozen-lockfile && VITE_API_BASE=https://mandate-api-1f5y.onrender.com npx --yes pnpm@10.33.0 run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
 
 databases:
   - name: mandate-db
