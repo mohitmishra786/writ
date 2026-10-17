@@ -31,7 +31,7 @@ import (
 
 type Config struct {
 	PublicBaseURL   string
-	ConsoleURL      string   // where the buyer lands after PayPal approval
+	ConsoleURL      string   // the operator console; allowed by CORS (PayPal return pages are served by this API)
 	AllowedOrigins  []string // CORS for the console
 	ClientTokenHost string   // domains[] for v6 client tokens; empty for local dev
 	PayPalClientID  string
@@ -201,7 +201,8 @@ func (s *Server) getMandate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) vaultSetup(w http.ResponseWriter, r *http.Request) {
-	base := strings.TrimRight(s.cfg.ConsoleURL, "/")
+	// /vault/return and /vault/cancel are served by this API, not the console.
+	base := strings.TrimRight(s.cfg.PublicBaseURL, "/")
 	st, err := s.svc.BeginVaultSetup(r.Context(), r.PathValue("id"), base+"/vault/return", base+"/vault/cancel")
 	if err != nil {
 		s.fail(w, err)
@@ -444,11 +445,13 @@ func (s *Server) paypalReturn(w http.ResponseWriter, r *http.Request) {
 		}
 		state = string(it.State)
 	}
-	http.Redirect(w, r, fmt.Sprintf("%s/approved?intent=%s&state=%s", strings.TrimRight(s.cfg.ConsoleURL, "/"), intentID, state), http.StatusSeeOther)
+	// /approved is the API's own self-contained page (the payer may be on a
+	// phone with no console session), so it is not on CONSOLE_URL.
+	http.Redirect(w, r, fmt.Sprintf("%s/approved?intent=%s&state=%s", strings.TrimRight(s.cfg.PublicBaseURL, "/"), intentID, state), http.StatusSeeOther)
 }
 
 func (s *Server) paypalCancel(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, fmt.Sprintf("%s/approved?intent=%s&state=cancelled", strings.TrimRight(s.cfg.ConsoleURL, "/"), r.URL.Query().Get("intent")), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("%s/approved?intent=%s&state=cancelled", strings.TrimRight(s.cfg.PublicBaseURL, "/"), r.URL.Query().Get("intent")), http.StatusSeeOther)
 }
 
 func (s *Server) shortLink(w http.ResponseWriter, r *http.Request) {
