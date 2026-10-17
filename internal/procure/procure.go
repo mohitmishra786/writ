@@ -279,6 +279,15 @@ func (a *Agent) tools(req RunRequest, st *runState) []llm.Tool {
 				}
 				var q *quote.Signed
 				st.mu.Lock()
+				// One proposal per run. The prompt says so, but a model that sees
+				// a decline tends to try again, and every attempt reserves part
+				// of the envelope; the owner's approval link is the recovery path.
+				if st.intentID != "" {
+					prev := st.intentID
+					st.mu.Unlock()
+					return toJSON(map[string]any{"refused": true, "intent_id": prev,
+						"note": "a purchase was already proposed in this run; do not propose again, report its outcome"}), nil
+				}
 				if s, ok := st.quotes[in.QuoteID]; ok {
 					q = &s
 				}
