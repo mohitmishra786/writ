@@ -1,5 +1,5 @@
 // AG Studio LLM adapter for Groq's OpenAI-compatible Responses API, reached
-// through Mandate's server proxy (POST /v1/ai/responses) so the key never
+// through Writ's server proxy (POST /v1/ai/responses) so the key never
 // reaches the browser. Written against the AgLlmAdapter contract in
 // ag-studio 3.0.0 (dist/types/api/ai/agLlmAdapter.d.ts, agAiMessage.d.ts,
 // agAiProtocol.d.ts).

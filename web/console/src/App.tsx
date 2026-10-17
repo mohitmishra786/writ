@@ -57,7 +57,7 @@ export function App() {
         setMandates(ms);
         setMandateId((cur) => cur || ms.find((m) => m.status === 'ACTIVE' && m.has_vault)?.id || ms[0]?.id || '');
       })
-      .catch((e) => setToast({ tone: 'critical', text: `Cannot reach the Mandate API at ${API_BASE}. ${String(e)}` }));
+      .catch((e) => setToast({ tone: 'critical', text: `Cannot reach the Writ API at ${API_BASE}. ${String(e)}` }));
   }, []);
 
   const refresh = useCallback(async () => {
@@ -165,8 +165,8 @@ export function App() {
     <div className={drawer ? 'app with-drawer' : 'app'}>
       <aside className="sidebar">
         <div className="wordmark">
-          <span className="name">Mandate</span>
-          <span className="sub">Signed authority for autonomous commerce</span>
+          <span className="name">Writ</span>
+          <span className="sub">Signed spending authority for AI agents</span>
         </div>
 
         <nav className="nav" aria-label="Pages">
@@ -360,7 +360,7 @@ function ApprovalBanner({ intent }: { intent: Intent }) {
     <div className="banner attention">
       <div>
         <strong>The card was declined for {usd(intent.amount.minor)} to {intent.payee_ref}.</strong>
-        <p className="muted small">Mandate did not retry the card. The owner chooses another funding source on PayPal's own page, and the purchase completes when they approve. Scan with a phone or open the link.</p>
+        <p className="muted small">Writ did not retry the card. The owner chooses another funding source on PayPal's own page, and the purchase completes when they approve. Scan with a phone or open the link.</p>
         <a className="link" href={intent.approval_url} target="_blank" rel="noreferrer">Open PayPal approval</a>
       </div>
       {qr && <img className="qr" src={qr} alt="QR code for the PayPal approval link" />}

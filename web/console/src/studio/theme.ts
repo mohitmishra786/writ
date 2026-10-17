@@ -1,4 +1,4 @@
-// Mandate's AG Studio theme. Parameter names are from AgStudioThemeParams in
+// Writ's AG Studio theme. Parameter names are from AgStudioThemeParams in
 // ag-studio 3.0.0. Values reference CSS variables (styles.css) that come from
 // the dataviz reference palette: warm-neutral surfaces, hairline borders,
 // near-black ink, and the categorical slots in their validated fixed order

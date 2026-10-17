@@ -1,12 +1,12 @@
-# Mandate
+# Writ
 
-**Signed authority for autonomous commerce.**
+**Signed spending authority for AI agents.** A writ is a written order that authorizes an action; Writ issues one, single-use and signed, for every purchase an agent is allowed to make.
 
 AI agents can now buy things. Today, the only way to let one pay is to hand it PayPal credentials with no limits: PayPal's own agent toolkit sends one idempotency key on every call ([paypal/agent-toolkit#98](https://github.com/paypal/agent-toolkit/issues/98), still open), and its only access control is a static tool allow-list that cannot see amounts ([PR #91](https://github.com/paypal/agent-toolkit/pull/91), closed unmerged).
 
-Mandate is the financial kernel that sits between any agent and PayPal. A human principal signs a **mandate** (budget envelope, per-order cap, co-sign threshold, velocity limits, allowlisted suppliers and categories). Every agent intent is checked by a deterministic policy engine *before* any credential exists. If authorized, Mandate reserves funds, mints a single-use Ed25519 capability, and executes an idempotent PayPal charge. Every step is written to a hash-chained, signed audit log in the same database transaction.
+Writ is the financial kernel that sits between any agent and PayPal. A human principal signs a **mandate** (budget envelope, per-order cap, co-sign threshold, velocity limits, allowlisted suppliers and categories). Every agent intent is checked by a deterministic policy engine *before* any credential exists. If authorized, Writ reserves funds, mints a single-use Ed25519 capability, and executes an idempotent PayPal charge. Every step is written to a hash-chained, signed audit log in the same database transaction.
 
-Mandate does not stop a model from being fooled by prompt injection. It bounds what a fooled model can do.
+Writ does not stop a model from being fooled by prompt injection. It bounds what a fooled model can do.
 
 ## Try it (hosted, PayPal sandbox)
 
@@ -16,11 +16,13 @@ Mandate does not stop a model from being fooled by prompt injection. It bounds w
 | API | https://mandate-api-1f5y.onrender.com (`/healthz`, `/v1/audit/verify`) |
 | MCP endpoint | `https://mandate-api-1f5y.onrender.com/mcp/<mandate_id>` |
 
+Code: https://github.com/mohitmishra786/writ (internal names such as `mandated` and the Go module path predate the product name).
+
 The scenario: a café's procurement agent keeps frothing pitchers in stock. The owner signed a mandate for it: $600 a week, $250 per order, co-sign above $200, two allowlisted suppliers. In the console's left sidebar:
 
 1. **Run procurement agent.** The agent reads the stock gap, checks the live market price on Channel3, negotiates with two supplier agents over A2A (signed quotes), and proposes a purchase. The kernel checks the mandate, reserves funds, mints a single-use capability and charges the owner's saved PayPal account. Follow it in **Activity**.
 2. **Simulate compromised agent.** An agent tries to send $4,800 to `attacker:refund-desk`. The kernel blocks it before any credential exists (`PAYEE_NOT_ALLOWED`); the Overview shows the blocked amount and reason.
-3. **Card declines at checkout**, then **Run procurement agent.** PayPal declines the charge (sandbox negative testing). Mandate does not retry the card: a banner shows a PayPal approval link and QR code, the owner picks another funding source on PayPal's page, and the purchase completes. Sandbox buyer credentials for this step are in the Devpost submission's testing instructions.
+3. **Card declines at checkout**, then **Run procurement agent.** PayPal declines the charge (sandbox negative testing). Writ does not retry the card: a banner shows a PayPal approval link and QR code, the owner picks another funding source on PayPal's page, and the purchase completes. Sandbox buyer credentials for this step are in the Devpost submission's testing instructions.
 4. **Settle suppliers now.** Obligations are netted into one PayPal Payouts batch per settlement run; the Settlement page shows the batch and item IDs.
 5. **Audit chain.** Every state change is SHA-256 hash-chained and checkpointed with Ed25519 signatures. The header badge re-verifies the whole chain.
 6. **Ask AI.** AG Studio's assistant (Claude Haiku 5.5) answers questions about the ledger and builds widgets, for example "How many intents were blocked, and why?" or "Add a bar chart of captured spend by payee." **AI usage** shows every model call it made.
@@ -151,7 +153,7 @@ scripts/demo-seed.sh https://<api-service>.onrender.com
 
 ## Sponsor tools
 
-- **AG Grid / AG Studio**: the operator console is an AG Studio report (KPI tiles, charts, grids over nine data sources) with Studio's AI assistant wired to Mandate's server-side model proxy.
+- **AG Grid / AG Studio**: the operator console is an AG Studio report (KPI tiles, charts, grids over nine data sources) with Studio's AI assistant wired to Writ's server-side model proxy.
 - **Channel3**: live retail price benchmark the procurement agent negotiates against.
 - **Render**: hosting for the API, the console and Postgres (`render.yaml`).
 - **APIMatic**: not used yet (planned: the APIMatic Context Plugin for PayPal during development).

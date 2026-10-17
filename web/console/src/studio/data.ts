@@ -1,4 +1,4 @@
-// AG Studio data sources for the Mandate console. Shapes follow ag-studio
+// AG Studio data sources for the Writ console. Shapes follow ag-studio
 // 3.0.0: AgSimpleDataSourceDefinition {id, name, description, data, fields}
 // with field formats from AgFormats; datetime values are Date objects.
 

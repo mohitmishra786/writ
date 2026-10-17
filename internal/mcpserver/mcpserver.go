@@ -79,8 +79,8 @@ type createOrderIn struct {
 	ReturnURL       string         `json:"returnUrl,omitempty"`
 	CancelURL       string         `json:"cancelUrl,omitempty"`
 	// Mandate extensions (optional for toolkit compatibility).
-	PayeeRef string `json:"payee_ref,omitempty" jsonschema:"Mandate extension: the allowlisted supplier reference to pay."`
-	Category string `json:"category,omitempty" jsonschema:"Mandate extension: product category slug."`
+	PayeeRef string `json:"payee_ref,omitempty" jsonschema:"Writ extension: the allowlisted supplier reference to pay."`
+	Category string `json:"category,omitempty" jsonschema:"Writ extension: product category slug."`
 }
 
 type idIn struct {
@@ -118,10 +118,10 @@ func cents(v float64) (int64, error) {
 
 func newServer(d Deps, mandateID string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "mandate", Version: "1.0.0"}, &mcp.ServerOptions{
-		Instructions: "Mandate: a spending firewall for AI agents. Tools mirror PayPal Agent Toolkit names; every payment is checked against the principal's signed mandate before PayPal is called.",
+		Instructions: "Writ: a spending firewall for AI agents. Tools mirror PayPal Agent Toolkit names; every payment is checked against the principal's signed mandate before PayPal is called.",
 	})
 
-	mcp.AddTool(s, &mcp.Tool{Name: "create_order", Description: "Create an order in PayPal. This tool is used to create a new order in PayPal. Through Mandate, the order is a purchase checked against the spending mandate; pay it with pay_order."},
+	mcp.AddTool(s, &mcp.Tool{Name: "create_order", Description: "Create an order in PayPal. This tool is used to create a new order in PayPal. Through Writ, the order is a purchase checked against the spending mandate; pay it with pay_order."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in createOrderIn) (*mcp.CallToolResult, any, error) {
 			if in.CurrencyCode != "USD" {
 				return nil, nil, errors.New("currencyCode must be USD")
@@ -181,7 +181,7 @@ func newServer(d Deps, mandateID string) *mcp.Server {
 				"payee": it.PayeeRef, "paypal_order_id": it.OrderID, "capture_id": it.CaptureID, "reasons": it.Reasons}), nil, nil
 		})
 
-	mcp.AddTool(s, &mcp.Tool{Name: "pay_order", Description: "Capture a payment for an order. Through Mandate, this consumes the single-use capability minted when the mandate authorized the order."},
+	mcp.AddTool(s, &mcp.Tool{Name: "pay_order", Description: "Capture a payment for an order. Through Writ, this consumes the single-use capability minted when the mandate authorized the order."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in idIn) (*mcp.CallToolResult, any, error) {
 			if !orderIDRe.MatchString(in.ID) {
 				return nil, nil, errors.New("Invalid PayPal Order ID") //nolint:staticcheck // exact @paypal/agent-toolkit error text
@@ -201,7 +201,7 @@ func newServer(d Deps, mandateID string) *mcp.Server {
 			return textResult(out), nil, nil
 		})
 
-	mcp.AddTool(s, &mcp.Tool{Name: "create_refund", Description: "Initiate a refund for a PayPal payment capture. Through Mandate, only captures made under this mandate can be refunded, and never beyond the captured amount."},
+	mcp.AddTool(s, &mcp.Tool{Name: "create_refund", Description: "Initiate a refund for a PayPal payment capture. Through Writ, only captures made under this mandate can be refunded, and never beyond the captured amount."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in createRefundIn) (*mcp.CallToolResult, any, error) {
 			if !captureIDRe.MatchString(in.CaptureID) {
 				return nil, nil, errors.New("Invalid Transaction ID") //nolint:staticcheck // exact @paypal/agent-toolkit error text
@@ -240,7 +240,7 @@ func newServer(d Deps, mandateID string) *mcp.Server {
 			return textResult(map[string]any{"id": in.RefundID, "status": status, "amount": money.New(minor, money.Currency(cur)).Decimal(), "capture_id": captureID}), nil, nil
 		})
 
-	mcp.AddTool(s, &mcp.Tool{Name: "list_transactions", Description: "List transactions made under this mandate (from the Mandate ledger)."},
+	mcp.AddTool(s, &mcp.Tool{Name: "list_transactions", Description: "List transactions made under this mandate (from the Writ ledger)."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ empty) (*mcp.CallToolResult, any, error) {
 			its, err := d.Kernel.ListIntents(ctx, mandateID, 100)
 			if err != nil {
@@ -254,7 +254,7 @@ func newServer(d Deps, mandateID string) *mcp.Server {
 			return textResult(map[string]any{"transactions": out}), nil, nil
 		})
 
-	mcp.AddTool(s, &mcp.Tool{Name: "mandate_get", Description: "Mandate-native: the spending mandate's limits, allowlisted payees and current envelope usage."},
+	mcp.AddTool(s, &mcp.Tool{Name: "mandate_get", Description: "Writ-native: the spending mandate's limits, allowlisted payees and current envelope usage."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ empty) (*mcp.CallToolResult, any, error) {
 			v, err := d.Kernel.GetMandate(ctx, mandateID)
 			if err != nil {
@@ -269,7 +269,7 @@ func newServer(d Deps, mandateID string) *mcp.Server {
 				"per_order_max": v.Policy.PerIntentMax.Decimal(), "cosign_above": v.Policy.CosignAbove.Decimal(), "payees": payees, "categories": v.Policy.Categories}), nil, nil
 		})
 
-	mcp.AddTool(s, &mcp.Tool{Name: "mandate_propose_purchase", Description: "Mandate-native: propose a purchase to an allowlisted payee; returns the policy decision with reason codes."},
+	mcp.AddTool(s, &mcp.Tool{Name: "mandate_propose_purchase", Description: "Writ-native: propose a purchase to an allowlisted payee; returns the policy decision with reason codes."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in proposeIn) (*mcp.CallToolResult, any, error) {
 			dec, err := d.Kernel.Propose(ctx, kernel.Proposal{MandateID: mandateID, AgentID: d.AgentID, PayeeRef: in.PayeeRef,
 				Amount: money.New(in.AmountMinor, money.USD), Category: in.Category, Trace: mustJSON(map[string]any{"via": "mcp:mandate_propose_purchase"})})
@@ -279,7 +279,7 @@ func newServer(d Deps, mandateID string) *mcp.Server {
 			return textResult(map[string]any{"order_id": orderID(dec.IntentID), "outcome": dec.Outcome, "state": dec.State, "reasons": dec.Reasons}), nil, nil
 		})
 
-	mcp.AddTool(s, &mcp.Tool{Name: "mandate_list_decisions", Description: "Mandate-native: recent policy decisions, including denials and their reason codes."},
+	mcp.AddTool(s, &mcp.Tool{Name: "mandate_list_decisions", Description: "Writ-native: recent policy decisions, including denials and their reason codes."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ empty) (*mcp.CallToolResult, any, error) {
 			its, err := d.Kernel.ListIntents(ctx, mandateID, 50)
 			if err != nil {

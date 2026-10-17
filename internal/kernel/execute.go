@@ -105,7 +105,7 @@ func (s *Service) Execute(ctx context.Context, intentID string, opt ExecOptions)
 
 func (s *Service) orderSpec(it Intent, invoiceID string) paypal.OrderSpec {
 	spec := paypal.OrderSpec{InvoiceID: invoiceID, CustomID: it.MandateID, Total: it.Amount,
-		Description: "Mandate purchase from " + it.PayeeRef}
+		Description: "Writ purchase from " + it.PayeeRef}
 	if it.Quote != nil {
 		q := it.Quote.Quote
 		for _, l := range q.Lines {
@@ -293,7 +293,7 @@ func (s *Service) StartRecovery(ctx context.Context, intentID string) (Intent, e
 	}
 	if s.notifier != nil {
 		msg := fmt.Sprintf("%s to %s was declined. Tap to approve with another funding source in PayPal.", it.Amount, it.PayeeRef)
-		_ = s.notifier.Notify(ctx, "Mandate: approval needed", msg, short)
+		_ = s.notifier.Notify(ctx, "Writ: approval needed", msg, short)
 	}
 	s.publish("intent", it)
 	return it, nil

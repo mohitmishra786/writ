@@ -1,4 +1,4 @@
-// Typed client for the Mandate API (mandated). Field names match the Go
+// Typed client for the Writ API (mandated). Field names match the Go
 // handlers in internal/api.
 
 export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:8080';

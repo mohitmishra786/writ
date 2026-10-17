@@ -605,7 +605,7 @@ func (s *Server) vaultReturn(w http.ResponseWriter, r *http.Request) {
 		s.plainPage("PayPal approval was received but linking failed; it will need to be retried.")(w, r)
 		return
 	}
-	s.plainPage(fmt.Sprintf("Your PayPal account is saved. Mandate %s is %s. You can close this tab.", v.ID, v.Status))(w, r)
+	s.plainPage(fmt.Sprintf("Your PayPal account is saved. Mandate %s is %s in Writ. You can close this tab.", v.ID, v.Status))(w, r)
 }
 
 func (s *Server) approvedPage(w http.ResponseWriter, r *http.Request) {
@@ -621,6 +621,6 @@ func (s *Server) approvedPage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) plainPage(msg string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = fmt.Fprintf(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mandate</title></head><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;color:#14213d"><h1 style="font-size:1.25rem">Mandate</h1><p>%s</p></body></html>`, html.EscapeString(msg))
+		_, _ = fmt.Fprintf(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Writ</title></head><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;color:#14213d"><h1 style="font-size:1.25rem">Writ</h1><p>%s</p></body></html>`, html.EscapeString(msg))
 	}
 }

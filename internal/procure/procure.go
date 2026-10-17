@@ -266,7 +266,7 @@ func (a *Agent) tools(req RunRequest, st *runState) []llm.Tool {
 			},
 		},
 		{
-			Spec: llm.ToolSpec{Name: "propose_purchase", Description: "Submits a purchase to the Mandate kernel, which checks the spending mandate and, if authorized, pays through PayPal.",
+			Spec: llm.ToolSpec{Name: "propose_purchase", Description: "Submits a purchase to the Writ kernel, which checks the spending mandate and, if authorized, pays through PayPal.",
 				Parameters: schema(map[string]any{"payee_ref": str, "amount_minor": integer, "quote_id": str}, "payee_ref", "amount_minor")},
 			Handler: func(ctx context.Context, args json.RawMessage) (string, error) {
 				var in struct {

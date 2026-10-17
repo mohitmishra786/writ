@@ -44,7 +44,7 @@ func (s *Service) Refund(ctx context.Context, rf Refunder, captureID string, amo
 		err := tx.QueryRow(ctx, `SELECT intent_id, amount_minor, currency, status FROM captures WHERE capture_id = $1 FOR UPDATE`, captureID).
 			Scan(&intentID, &captured, &cur, &status)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("%w: capture %s was not made by Mandate", ErrRefundDenied, captureID)
+			return fmt.Errorf("%w: capture %s was not made by Writ", ErrRefundDenied, captureID)
 		}
 		if err != nil {
 			return err

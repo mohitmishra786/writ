@@ -124,14 +124,14 @@ func (s *Service) SettleMandate(ctx context.Context, mandateID string) (BatchRes
 }
 
 func (s *Service) sendBatch(ctx context.Context, batchID, senderBatchID string, items []netItem, currency string, total int64) (BatchResult, error) {
-	req := paypal.PayoutBatch{SenderBatchID: senderBatchID, EmailSubject: "Payment from Mandate"}
+	req := paypal.PayoutBatch{SenderBatchID: senderBatchID, EmailSubject: "Payment from Writ"}
 	for i, n := range items {
 		itemID, err := idem.SenderItemID(fmt.Sprintf("%s-%d", batchID[4:], i))
 		if err != nil {
 			return BatchResult{}, err
 		}
 		req.Items = append(req.Items, paypal.PayoutItem{ReceiverEmail: n.receiver, Amount: money.New(n.amount, money.Currency(currency)),
-			SenderItemID: itemID, Note: fmt.Sprintf("Mandate settlement for %d purchase(s) from %s", len(n.ids), n.payee)})
+			SenderItemID: itemID, Note: fmt.Sprintf("Writ settlement for %d purchase(s) from %s", len(n.ids), n.payee)})
 	}
 	res, callErr := s.pp.CreatePayoutBatch(ctx, req)
 	status := res.BatchHeader.BatchStatus

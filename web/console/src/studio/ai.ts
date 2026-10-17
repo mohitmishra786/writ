@@ -1,6 +1,6 @@
-// Studio Agent Framework wiring: Studio's built-in agents (the "Mandate
+// Studio Agent Framework wiring: Studio's built-in agents (the "Writ
 // Auditor" assistant) answer questions about the ledger by building widgets.
-// Turns go through the Responses adapter to Mandate's server proxy.
+// Turns go through the Responses adapter to Writ's server proxy.
 
 import { createAiHarness, type AgAiHarnessSetup, type AgAiModel, type AgAiPromptStarter } from 'ag-studio';
 import { API_BASE } from '../api';
